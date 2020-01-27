@@ -1,0 +1,12 @@
+local rvg = {}
+
+-- this is a loop with non-zero fill
+rvg.scene = scene{
+  fill(path{M,190,10,190,190,10,190,10,10,C,340,250,-140,250,190,10,Z}, rgb8(255,0,0)),
+}:translated(5.5,5.5)
+
+rvg.window = window(0,0,210,210)
+
+rvg.viewport = viewport(0,0,210,210)
+
+return rvg

@@ -1,0 +1,13 @@
+local rvg = {}
+
+-- this has the reverse orientation as arc2.rvg
+local sqrt3 = 1.7320508
+rvg.scene = scene{
+  fill(path{M,100,100,L,50*(2-sqrt3),150,R,50,150,0.5,50*(2+sqrt3),150,Z}, rgb8(255,0,0)),
+}:translated(5.5,5.5-50)
+
+rvg.window = window(0,0,210,210)
+
+rvg.viewport = viewport(0,0,210,210)
+
+return rvg

@@ -1,0 +1,12 @@
+local rvg = {}
+
+-- these rational quadratics degenerate to a line
+rvg.scene = scene{
+  fill(path{M,0,0,R,150,300,1,100,200,150,100,1,200,0,Z}, rgb8(255,0,0)),
+}:translated(5.5,5.5)
+
+rvg.window = window(0,0,210,210)
+
+rvg.viewport = viewport(0,0,210,210)
+
+return rvg

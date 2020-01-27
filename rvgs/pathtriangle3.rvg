@@ -1,0 +1,13 @@
+local rvg = {}
+
+-- closed triangle in closed contour
+rvg.scene = scene{
+  fill(path{M,0,0,100,100,200,0,0,0,Z},
+      rgb8(0,0,255)),
+}
+
+rvg.window = window(0,0,200,200)
+
+rvg.viewport = viewport(0,0,200,200)
+
+return rvg

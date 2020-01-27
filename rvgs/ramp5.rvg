@@ -1,0 +1,19 @@
+local rvg = {}
+
+local r = color_ramp(spread.clamp, {
+    {0,color.red},
+    {.5,color.yellow},
+    {.5,color.black},
+    {.5,color.cyan},
+    {1,color.blue}
+})
+
+rvg.scene = scene{
+  fill(polygon{0,0,200,0,200,200,0,200}, linear_gradient(r,50,100,150,100)),
+}
+
+rvg.window = window(0,0,200,200)
+
+rvg.viewport = viewport(0,0,200,200)
+
+return rvg

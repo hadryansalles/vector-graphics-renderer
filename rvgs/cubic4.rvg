@@ -1,0 +1,12 @@
+local rvg = {}
+
+-- this is a horizontal inflection (with cusp at infinity)
+rvg.scene = scene{
+  fill(path{M,0,0,L,200,0,C,200,200,0,0,0,200,Z}, rgb8(255,0,0)),
+}:translated(5.5,5.5)
+
+rvg.window = window(0,0,210,210)
+
+rvg.viewport = viewport(0,0,210,210)
+
+return rvg

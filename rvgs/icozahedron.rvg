@@ -1,0 +1,30 @@
+local rvg = {}
+
+rvg.scene = scene{
+  fill(triangle(1,-63,87,-183,30,-138),
+      rgb8(204,250,167)),
+  fill(triangle(87,56,1,-63,30,10),
+      rgb8(201,98,50)),
+  fill(triangle(228,10,87,56,170,56),
+      rgb8(85,51,51)),
+  fill(triangle(228,-137,228,10,255,-63),
+      rgb8(56,56,95)),
+  fill(triangle(228,10,124,-63,87,56),
+      rgb8(143,54,79)),
+  fill(triangle(124,-63,228,10,228,-137),
+      rgb8(85,77,174)),
+  fill(triangle(124,-63,1,-63,87,56),
+      rgb8(251,165,109)),
+  fill(triangle(87,-183,1,-63,124,-63),
+      rgb8(254,254,225)),
+  fill(triangle(87,-183,124,-63,228,-137),
+      rgb8(152,208,255)),
+  fill(triangle(168,-183,87,-183,228,-137),
+      rgb8(50,159,231)),
+}:translated(0, 192)
+
+rvg.window = window(0,0,256,256)
+
+rvg.viewport = viewport(0,0,256,256)
+
+return rvg

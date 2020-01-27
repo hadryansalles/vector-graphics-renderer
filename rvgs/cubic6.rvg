@@ -1,0 +1,12 @@
+local rvg = {}
+
+-- this is a degenerate cubic (a quadratic)
+rvg.scene = scene{
+  fill(path{M,1,0,C,67,198,133,198,199,0,Z}, rgb8(255,0,0)),
+}:translated(5.5,5.5)
+
+rvg.window = window(0,0,210,210)
+
+rvg.viewport = viewport(0,0,210,210)
+
+return rvg

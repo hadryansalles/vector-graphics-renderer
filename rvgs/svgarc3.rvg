@@ -1,0 +1,17 @@
+local rvg = {}
+
+-- this needs the diagonal test
+rvg.scene = scene{
+  fill(path{
+    M,0,0,
+    A, 170.93759037145, 41.455568576071, 68.298113875181, 0, 0, 100, 150,
+    A, 170.93748672601, 41.455866012684, 111.70180360318, 0, 0, 200, 0,
+    Z
+}, rgb8(255,0,0)),
+}:translated(5.5,5.5)
+
+rvg.window = window(0,0,210,210)
+
+rvg.viewport = viewport(0,0,210,210)
+
+return rvg

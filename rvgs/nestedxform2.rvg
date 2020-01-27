@@ -1,0 +1,42 @@
+local rvg = {}
+
+local r = rect(0,0,1,1)
+
+rvg.scene = scene({
+    fill(r:scaled(200), color.lightgray),
+    transform(translation(50,50), {
+        transform(scaling(20), {
+            fill(r, color.red),
+            transform(translation(0, 2), {
+                fill(r, color.green),
+                transform(translation(0, 2), {
+                    fill(r, color.blue),
+                }),
+            }),
+            transform(translation(2, 0), {
+                fill(r, color.yellow),
+                transform(translation(0, 2), {
+                    fill(r, color.orange),
+                    transform(translation(0, 2), {
+                        fill(r, color.purple),
+                    }),
+                }),
+                transform(translation(2, 0), {
+                    fill(r, color.black),
+                    transform(translation(0, 2), {
+                        fill(r, color.gray),
+                        transform(translation(0, 2), {
+                            fill(r, color.cyan),
+                        }),
+                    }),
+                }),
+            }),
+        })
+    })
+})
+
+rvg.window = window(0,0,200,200)
+
+rvg.viewport = viewport(0,0,200,200)
+
+return rvg

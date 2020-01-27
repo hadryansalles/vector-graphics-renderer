@@ -1,0 +1,13 @@
+I suggest you use the Docker image diegonehab/vg. If, for some reason, you
+decide not to...
+
+On Windows, do not use the makefile.
+First, download all precompiled libraries from the course page (vc19.zip).
+Expand the vc19.zip to some directory.
+(Warning, icu is a gigantic lib. This will unpack to 1GB of data.)
+Modify paths.props to reflect where you expanded vc19.zip.
+Then, open the solution file (vg.sln) provided with Visual Studio 2019.
+When running, I suggest you use git-bash.
+When input and output is to console, prefix calls to Lua with with winpty.
+
+For Linux and Mac OS, please read the makefile for further instructions.

@@ -1,0 +1,15 @@
+local rvg = {}
+
+local r = color_ramp(spread.mirror, {{0,color.black}, {1,color.white}})
+
+rvg.scene = scene{
+  fill(polygon{0,0,200,0,200,200,0,200}, color.red),
+  fill(polygon{2,2,198,2,198,198,2,198},
+      linear_gradient(r, 50,100,150,100)),
+}
+
+rvg.window = window(0,0,200,200)
+
+rvg.viewport = viewport(0,0,200,200)
+
+return rvg

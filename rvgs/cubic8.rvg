@@ -1,0 +1,12 @@
+local rvg = {}
+
+-- this is a cubic with repeated third and fourth control points
+rvg.scene = scene{
+  fill(path{M,0,0,C,175,360,200,0,200,0,Z}, rgb8(255,0,0)),
+}:translated(5.5,5.5)
+
+rvg.window = window(0,0,210,210)
+
+rvg.viewport = viewport(0,0,210,210)
+
+return rvg

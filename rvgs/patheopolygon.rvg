@@ -1,0 +1,12 @@
+local rvg = {}
+
+rvg.scene = scene{
+  eofill(path{M,512,256,177,499,49,106,463,106,335,499,0,256,335,13,463,406,49,406,177,13,Z},
+    rgb8(0,0,255)),
+}
+
+rvg.window = window(0,0,512,512)
+
+rvg.viewport = viewport(0,0,512,512)
+
+return rvg

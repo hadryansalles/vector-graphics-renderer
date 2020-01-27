@@ -1,0 +1,12 @@
+local rvg = {}
+
+rvg.scene = scene{
+  fill(triangle(0,0,200,0,100,100),
+      rgb8(0,0,255)),
+}
+
+rvg.window = window(0,0,200,200)
+
+rvg.viewport = viewport(0,0,200,200)
+
+return rvg

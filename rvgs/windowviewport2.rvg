@@ -1,0 +1,15 @@
+local rvg = {}
+
+rvg.scene = scene{
+  fill(polygon{0,20,20,200,200,180,180,0}:
+         windowviewport(
+           window(0,0,200,200),
+           viewport(30,0,100,150)),
+      rgb8(0,0,255)),
+}
+
+rvg.window = window(30,0,100,150)
+
+rvg.viewport = viewport(0,0,200,200)
+
+return rvg

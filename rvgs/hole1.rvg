@@ -1,0 +1,11 @@
+local rvg = {}
+
+rvg.scene = scene{
+  eofill(polygon{100,30,30,100,100,170,170,100,100,30,100,60,60,100,100,140,140,100,100,60,100,30}, rgb8(0,0,255)),
+}:translated(5.5,5.5)
+
+rvg.window = window(0,0,210,210)
+
+rvg.viewport = viewport(0,0,210,210)
+
+return rvg
