@@ -2,3 +2,5 @@
 *.d
 *.vcxproj
 *.sln
+*.so
+a.png
