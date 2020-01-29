@@ -25,555 +25,485 @@
 
 #include "rvg-driver-png.h"
 
-#define EPS 0.0000000001
+#define EPS 0.000000001
 
 namespace rvg {
     namespace driver {
-        namespace png { 
+        namespace png {
+
+R2 transform_point(const R2 point, const xform& xf){
+    return make_R2(xf[0][0]*point.get_x() + xf[0][1]*point.get_y() + xf[0][2],
+                   xf[1][0]*point.get_x() + xf[1][1]*point.get_y() + xf[1][2]);
+}
+
+R2 transform_point(const R2 point, double w, const xform& xf){
+    return make_R2(xf[0][0]*point.get_x() + xf[0][1]*point.get_y() + w*xf[0][2],
+                   xf[1][0]*point.get_x() + xf[1][1]*point.get_y() + w*xf[1][2]);
+}
+
+float det(const xform& xf){
+    return xf[0][0]*xf[1][1] - xf[0][1]*xf[1][0];
+} 
+
+int sign(float x){
+    if(x > 0){
+        return 1;
+    }
+    if(x < 0){
+        return -1;
+    }
+    else{
+        return 0;
+    }
+}
+
+class path_segment;
 
 class bouding_box {
-    private:
-        R2 m_p0;
-        R2 m_p1;
-    public:
-        bouding_box(std::vector<R2> &points);
-        bool hit_left(const double x, const double y) const;
-        bool hit_right(const double x, const double y) const;
-        bool hit_inside(const double x, const double y) const;
-};
+private:
+    R2 p0;
+    R2 p1;
 
-namespace monotonic {
-
-    class path_segment {
-    protected:
-        std::vector<R2> m_points; // control points
-        const bouding_box m_bbox; // segment bouding box
-        int m_dir;
-    public:
-        path_segment(std::vector<R2> points);
-        virtual ~path_segment();
-
-        R2 p_in_t(const double t) const;
-        virtual double x_in_t(const double t) const = 0;
-        virtual double y_in_t(const double t) const = 0;
-        bool intersect(const double x, const double y) const;
-        int get_dir() const;
+public:
+    inline bouding_box()
+    {};
+    inline ~bouding_box()
+    {};
+    inline void set(R2 p0, R2 p1){
+        double x_min = std::min(p0.get_x(), p1.get_x());
+        double y_min = std::min(p0.get_y(), p1.get_y());
+        double x_max = std::max(p0.get_x(), p1.get_x());
+        double y_max = std::max(p0.get_y(), p1.get_y());
+        this->p0 = make_R2(x_min, y_min);
+        this->p1 = make_R2(x_max, y_max);
     };
-
-    class linear_segment : public path_segment {
-    public:
-        linear_segment(std::vector<R2> points); 
-        double x_in_t(const double t) const;
-        double y_in_t(const double t) const;
+    inline void set(std::vector<R2> points){
+        assert(points.size() > 0);
+        float x_min = points[0].get_x();
+        float y_min = points[0].get_y();
+        float x_max = points[0].get_x();
+        float y_max = points[0].get_y();
+        for(auto point : points){
+            x_min = std::min(point.get_x(), x_min);
+            y_min = std::min(point.get_y(), y_min);
+            x_max = std::max(point.get_x(), x_max);
+            y_max = std::max(point.get_y(), y_max);
+        }   
+        p0 = make_R2(x_min, y_min);
+        p1 = make_R2(x_max, y_max);
     };
-
-    class quadratic_segment : public path_segment {
-    public:
-        quadratic_segment(std::vector<R2> points);  // POSSIBLE BUG
-        virtual double x_in_t(const double t) const;
-        virtual double y_in_t(const double t) const;
-    };
-
-    class rational_quadratic_segment : public quadratic_segment {
-    private: 
-        quadratic_segment den;
-    public:
-        rational_quadratic_segment(std::vector<R2> points, std::vector<R2> den_points); // ASSERT size = 2
-        double x_in_t(const double t) const;
-        double y_in_t(const double t) const;
-    };
-
-    class cubic_segment : public path_segment {
-    public:
-        cubic_segment(std::vector<R2> points);
-        double x_in_t(const double t) const;
-        double y_in_t(const double t) const;
-    };
-
-} // end monotonic
-
-namespace raw {
-
-    class path_segment {
-    protected:
-        std::vector<R2> m_points;
-        double m_w;
-
-        R2 blossom(double a, double b) const;
-        R2 blossom(double a, double b, double c) const;
-
-        static std::vector<double> roots(double A, double B);
-        static std::vector<double> roots(double A, double B, double C);
-        static std::vector<double> organized_roots(std::vector<double> &x_roots, std::vector<double> &y_roots);
     
-    public:
-        path_segment();
-        virtual ~path_segment();
+    void set(std::vector<path_segment*> segments);
 
-        void apply(const xform& xf);
-        virtual std::vector<R2> reparametrize(double t0, double t1) const = 0;
-        virtual std::vector<double> d_roots() const = 0;
+    inline bool hit(const double x, const double y) const {
+        return y >= p0.get_y() && y < p1.get_y() && x >= p0.get_x() && x < p1.get_x();
     };
-
-    class linear_segment : public path_segment {
-    public:
-        linear_segment(R2 p1, R2 p2);
-        std::vector<R2> reparametrize(double t0, double t1) const;
-        std::vector<double> d_roots() const;
+    inline bool hit_in(const double x, const double y) const {
+        return y >= p0.get_y() && y < p1.get_y() && x <= p0.get_x(); 
     };
-
-    class quadratic_segment : public path_segment {
-    public:
-        quadratic_segment(R2 p1, R2 p2, R2 p3);
-        std::vector<R2> reparametrize(double t0, double t1) const;
-        std::vector<double> d_roots() const;
+    inline bool hit_out(const double x, const double y) const {
+        return (p1.get_x() < x || p0.get_y() > y || p1.get_y() <= y);
     };
-
-    class rational_quadratic_segment : public quadratic_segment {
-    private:
-        quadratic_segment den;
-    public:
-        rational_quadratic_segment(R2 p1, R2 p2, R2 p3, double w);
-        std::vector<R2> reparametrize(double t0, double t1) const;
-        std::vector<R2> reparametrize_den(double t0, double t1) const;
-        std::vector<double> d_roots() const;
-    };
-
-    class cubic_segment : public path_segment {
-    public:
-        cubic_segment(R2 p1, R2 p2, R2 p3, R2 p4);
-        std::vector<R2> reparametrize(double t0, double t1) const;
-        std::vector<double> d_roots() const;
-    };
-
-} // end raw
-
-//  Iterates through path_data getting its parameters and creates a representation 
-//  with only monotonic segments
-class path_builder final : public i_input_path<path_builder>{
-    private:
-        friend i_input_path<path_builder>;
-        std::vector<monotonic::path_segment*> m_path;
-        const xform m_xf;
-        R2 m_last_move;
-        
-    public:
-        path_builder(const xform& xf);
-        ~path_builder();
-
-        std::vector<monotonic::path_segment*> get_path() const;
-
-        void do_linear_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1);
-        void do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2);
-        void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2);
-        void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3);
-        void do_begin_contour(rvgf x0, rvgf y0);
-        void do_end_open_contour(rvgf x0, rvgf y0);
-        void do_end_closed_contour(rvgf x0, rvgf y0);
 };
 
-
-bool almost_zero(const double& x) {
-    return (std::abs(x) < EPS);
-}
-
-bouding_box::bouding_box(std::vector<R2> &points){
-    assert(points.size() > 1);
-    R2 first = points[0];
-    R2 last = points[points.size()-1];
-    m_p0 = make_R2(std::min(first.get_x(), last.get_x()), std::min(first.get_y(), last.get_y()));
-    m_p1 = make_R2(std::max(first.get_x(), last.get_x()), std::max(first.get_y(), last.get_y()));
-}
-
-bool bouding_box::hit_left(const double x, const double y) const {
-    return y >= m_p0.get_y() && y < m_p1.get_y() && x <= m_p0.get_x();
-}
-
-bool bouding_box::hit_right(const double x, const double y) const {
-    return y >= m_p0.get_y() && y < m_p1.get_y() && x > m_p1.get_x();
-}
-
-bool bouding_box::hit_inside(const double x, const double y) const {
-    return y >= m_p0.get_y() && y < m_p1.get_y() && x >= m_p0.get_x() && x < m_p1.get_x();
-}
-
-namespace monotonic {
-
-    path_segment::path_segment(std::vector<R2> points) 
-        : m_bbox(points) 
-        , m_dir(1) { 
-        for (auto point : points){
-            m_points.push_back(point);
+class path_segment {
+protected:
+    std::vector<R2> points;
+    bouding_box bbox;
+public:
+    inline path_segment(){};
+    inline virtual ~path_segment(){points.clear();};
+    inline virtual void apply_xf(const xform& xf) {
+        // printf("transformou segmento.\n");
+        for(unsigned int i = 0; i < points.size(); i++){
+            points[i] = transform_point(points[i], xf);
         }
-        if(m_points[0].get_y() > m_points[m_points.size()-1].get_y()){
-            m_dir = -1;
+        bbox.set(points);
+    };
+    virtual double x_in_t(const double t) const = 0;
+    virtual double y_in_t(const double t) const = 0;
+    virtual bool specific_hit(const double x, const double y) const {
+        assert(points.size() > 1);
+        int a = 1;
+        if(points[points.size()-1].get_y() > points[0].get_y()){
+            a = -1;
         }
-    }
-
-    R2 path_segment::p_in_t(const double t) const {
-        return make_R2(x_in_t(t), y_in_t(t));
-    }
-
-    bool path_segment::intersect(const double x, const double y) const {
-        if(!m_bbox.hit_left(x, y)){
-            if(m_bbox.hit_right(x, y)){
-                return true;
+        double _y;
+        double d = 0.5;
+        double t = 0.5;
+        do {
+            d /= 2.0;
+            _y = y_in_t(t); 
+            if(_y > y){
+                t += (double)a*d;
             }
-            else{
-                double bisection_y;
-                double step = 0.5;
-                double t = 0.5;
-                do {
-                    step /= 2.0;
-                    bisection_y = y_in_t(t); 
-                    if(bisection_y > y){
-                        t += (double)m_dir*step;
-                    }
-                    else if(bisection_y < y){
-                        t -= (double)m_dir*step;
-                    }
-                } while(bisection_y != y || step > 0.01);
-                return x-x_in_t(t) < EPS;
+            else if(_y < y){
+                t -= (double)a*d;
+            }
+        } while(d > 0.001);
+        return x-x_in_t(t) < EPS;
+    };
+    inline virtual int hit(const double x, const double y) const {
+        assert(points.size() > 1);
+        if(!bbox.hit_out(x, y)){
+            R2 pi = points[0];
+            R2 pf = points[points.size()-1];
+            int a = 1;
+            if(std::min(pi.get_y(), pf.get_y()) == pf.get_y()){
+                a = -1;
+            }
+            if(bbox.hit_in(x, y) || specific_hit(x,y)){
+                return a;
             }
         }
         return 0;
-    }
-
-    int path_segment::get_dir() const {
-        return m_dir;
-    }
-
-    linear_segment::linear_segment(std::vector<R2> points)
-        : path_segment(points) {
-        assert(points.size() == 2);
-    }
-
-    double linear_segment::x_in_t(const double t) const {
-        return t*m_points[0].get_x() + t*m_points[1].get_x();
-    }
-
-    double linear_segment::y_in_t(const double t) const {
-        return t*m_points[0].get_y() + t*m_points[1].get_y();
-    }
-
-    quadratic_segment::quadratic_segment(std::vector<R2> points)
-        : path_segment(points){
-            assert(points.size() == 3);
-    }
-
-    double quadratic_segment::x_in_t(const double t) const {
-        return m_points[0].get_x()*(1-t)*(1-t) + m_points[1].get_x()*2*(t - t*t) + m_points[2].get_x()*t*t;
-    }
-
-    double quadratic_segment::y_in_t(const double t) const {
-        return m_points[0].get_y()*(1-t)*(1-t) + m_points[1].get_y()*2*(t - t*t) + m_points[2].get_y()*t*t;
-    }
-
-    rational_quadratic_segment::rational_quadratic_segment(std::vector<R2> points, std::vector<R2> den_points)
-        : quadratic_segment(points)
-        , den(den_points) {
-    }
-
-    double rational_quadratic_segment::x_in_t(const double t) const {
-        return quadratic_segment::x_in_t(t)/den.x_in_t(t);
-    }
-
-    double rational_quadratic_segment::y_in_t(const double t) const {
-        return quadratic_segment::y_in_t(t)/den.y_in_t(t);
-    }
-
-    cubic_segment::cubic_segment(std::vector<R2> points) 
-        : path_segment(points){
-        assert(points.size() == 4);
-    }
-
-    double cubic_segment::x_in_t(const double t) const {
-        return m_points[0].get_x()*(1-t)*(1-t)*(1-t) + 
-            m_points[1].get_x()*3.0*(1-t)*(1-t)*t + 
-            m_points[2].get_x()*3.0*t*t*(1-t) + 
-            m_points[3].get_x()*t*t*t;
-    }
-
-    double cubic_segment::y_in_t(const double t) const {
-        return m_points[0].get_y()*(1-t)*(1-t)*(1-t) + 
-            m_points[1].get_y()*3.0*(1-t)*(1-t)*t + 
-            m_points[2].get_y()*3.0*t*t*(1-t) + 
-            m_points[3].get_y()*t*t*t;
-    }
-
-} // end monotonic
-
-namespace raw {
-
-    path_segment::path_segment() 
-        : m_w(1.0)
-    {}
-
-    path_segment::~path_segment() {
-        m_points.clear();
-    }
-
-    void path_segment::apply(const xform& xf) {
-        for(auto& point : m_points) {
-            point = make_R2(xf[0][0]*point.get_x() + xf[0][1]*point.get_y() + m_w*xf[0][2],
-                            xf[1][0]*point.get_x() + xf[1][1]*point.get_y() + m_w*xf[1][2]);
+    };
+    inline void print() const {
+        for(unsigned int i = 0; i < points.size(); i++){
+            printf("(%.3f, %.3f) ", points[i].get_x(), points[i].get_y());
         }
+        printf("\n");
+    };
+    inline R2 get_point(unsigned int indice){
+        assert(indice < points.size());
+        return points[indice];
     }
-
-    R2 path_segment::blossom(double a, double b) const {
-        assert(m_points.size() == 3);
-        double x = (1-a)*((1-b)*m_points[0].get_x() + b*m_points[1].get_x()) + a*((1-b)*m_points[1].get_x() + b*m_points[2].get_x());
-        double y = (1-a)*((1-b)*m_points[0].get_y() + b*m_points[1].get_y()) + a*((1-b)*m_points[1].get_y() + b*m_points[2].get_y());
-        return make_R2(x, y);   
+    inline R2 get_max() const {
+        assert(points.size() > 0);
+        return points[points.size()-1];
     }
-
-    R2 path_segment::blossom(double a, double b, double c) const {
-        assert(m_points.size() == 4);
-        double x = (((1-a)*m_points[0].get_x() +
-                    (a)*m_points[1].get_x())*(1-b) +
-                    ((1-a)*m_points[1].get_x() +
-                    (a)*m_points[2].get_x())*(b)) * (1-c) + 
-                (((1-a)*m_points[1].get_x() +
-                    (a)*m_points[2].get_x())*(1-b) +
-                    ((1-a)*m_points[2].get_x() +
-                    (a)*m_points[3].get_x())*(b)) * (c);
-        double y = (((1-a)*m_points[0].get_y() +
-                    (a)*m_points[1].get_y())*(1-b) +
-                    ((1-a)*m_points[1].get_y() +
-                    (a)*m_points[2].get_y())*(b)) * (1-c) + 
-                (((1-a)*m_points[1].get_y() +
-                    (a)*m_points[2].get_y())*(1-b) +
-                    ((1-a)*m_points[2].get_y() +
-                    (a)*m_points[3].get_y())*(b)) * (c);
-        return make_R2(x, y);
+    inline R2 get_min() const {
+        assert(points.size() > 0);
+        return points[0];
     }
+};
 
-    std::vector<double> path_segment::roots(double A, double B) {
-        // double A = a - 2*b + c;
-        // double B = a - b;
-        std::vector<double> r_roots;
-        if(!almost_zero(A)){
-            r_roots.push_back(B/A);
+
+void bouding_box::set(std::vector<path_segment*> segments){
+    assert(segments.size() > 0);
+    float x_min = segments[0]->get_min().get_x();
+    float y_min = segments[0]->get_min().get_y();
+    float x_max = segments[0]->get_max().get_x();
+    float y_max = segments[0]->get_max().get_y();
+    for(unsigned int i = 0; i < segments.size(); i++){
+        x_min = std::min(segments[i]->get_min().get_x(), x_min);
+        y_min = std::min(segments[i]->get_min().get_y(), y_min);
+        x_max = std::max(segments[i]->get_max().get_x(), x_max);
+        y_max = std::max(segments[i]->get_max().get_y(), y_max);
+    }
+    p0 = make_R2(x_min, y_min);
+    p1 = make_R2(x_max, y_max);
+}
+
+
+class linear_p_segment : public path_segment {
+public:
+    inline linear_p_segment() : path_segment() 
+    {};
+    inline linear_p_segment(const R2 p1, const R2 p2) : path_segment() {
+        points.push_back(p1);
+        points.push_back(p2);
+        bbox.set(points);
+    };
+    inline void set(const R2 p1, const R2 p2){
+        points.clear();
+        points.push_back(p1);
+        points.push_back(p2);
+        bbox.set(points);
+    };
+    inline bool specific_hit(const double x, const double y) const{
+        assert(points.size() > 1);
+        R2 p1 = points[0];
+        R2 p2 = points[points.size()-1];
+        if(std::min(p1.get_y(), p2.get_y()) <= y && std::max(p1.get_y(), p2.get_y()) > y){
+            float dy = p2.get_y() - p1.get_y();
+            float dx = p2.get_x() - p1.get_x();
+            return dy*((x - p1.get_x())*dy - (y - p1.get_y())*dx) <= 0;
         }
-        return r_roots;
+        return false;
+    };
+    virtual double y_in_t(const double t) const{
+        (void) t;
+        return 0;
     }
+    virtual double x_in_t(const double t) const{
+        (void) t;
+        return 0;
+    }
+};
 
-    std::vector<double> path_segment::roots(double A, double B, double C) {
-        // double A = 3*d - 9*c + 9*b - 3*a;
-        // double B = 6*c - 12*b + 6*a;
-        // double C = 3*b - 3*a;
-        // double A = -2*a*w + 2*a + 2*w*c - 2*c;
-        // double B = 4*a*w - 2*a - 4*b + 2*c;
-        // double C = -2*a*w + 2*b;
-        std::vector<double> r_roots;
-        double delta = B*B - 4*A*C;
-        if(!almost_zero(A)){
-            if(delta > 0) {
-                double sqrt = std::sqrt(delta);
-                r_roots.push_back((-B+sqrt)/(2*A));
-                r_roots.push_back((-B-sqrt)/(2*A));
-            }
-            else if(almost_zero(delta)) {
-                r_roots.push_back(-B/(2*A));
-            }
-        }   
+class quadratic_p_segment : public path_segment {
+public:
+    inline quadratic_p_segment(){
+    };
+    inline quadratic_p_segment(const R2 p1, const R2 p2, const R2 p3){
+        points.push_back(p1);
+        points.push_back(p2);
+        points.push_back(p3);
+        bbox.set(points);
+    };
+    inline void set(const R2 p1, const R2 p2, const R2 p3){
+        points.clear();
+        points.push_back(p1);
+        points.push_back(p2);
+        points.push_back(p3);
+        bbox.set(points);
+    };
+    inline static double derivative_root(double a, double b, double c){
+        double d = a - 2*b + c;
+        if(!(std::abs(d) > EPS)){
+            return 0;
+        }
+        double n = (a-b)/d;
+        if(n < EPS || (n-1) > EPS) {
+            return 0;
+        }
         else{
-            r_roots.push_back(-C/B);
+            return n;
         }
-        return r_roots;
-    } 
+    };
+    inline static double val_in_quad_bezie(double t, double p0, double p1, double p2){
+        return p0*(1-t)*(1-t) + p1*2*(t - t*t) + p2*t*t;
+    };
+    inline double x_in_t(double t)const{
+        assert(points.size() > 1);
+        return points[0].get_x()*(1-t)*(1-t) + points[1].get_x()*2*(t - t*t) + points[2].get_x()*t*t;
+    };
+    inline double y_in_t(double t)const{
+        assert(points.size() > 1);
+        return points[0].get_y()*(1-t)*(1-t) + points[1].get_y()*2*(t - t*t) + points[2].get_y()*t*t;
+    };
+    inline R2 r2_in_t(double t)const{
+        return make_R2(x_in_t(t), y_in_t(t));
+    };
+    inline R2 blossom(double s, double r)const{
+        assert(points.size() > 1);
+        double x = (1-s)*((1-r)*points[0].get_x() + r*points[1].get_x()) + s*((1-r)*points[1].get_x() + r*points[2].get_x());
+        double y = (1-s)*((1-r)*points[0].get_y() + r*points[1].get_y()) + s*((1-r)*points[1].get_y() + r*points[2].get_y());
+        return make_R2(x, y);
+    };
+    inline quadratic_p_segment* reparametrize(double t0, double t1)const{
+        R2 pP1 = r2_in_t(t0);
+        R2 pP2 = blossom(t0, t1);
+        R2 pP3 = r2_in_t(t1);
+        return new quadratic_p_segment(pP1, pP2, pP3);
+    };
+    inline bool is_linear() const {
+        assert(points.size() == 3);
+        R2 p0 = points[0];
+        R2 p1 = points[1];
+        R2 p2 = points[2];
+        return std::abs((p1.get_x()-p0.get_x())*(p2.get_y()-p0.get_y())-(p2.get_x()-p0.get_x())*(p1.get_y()-p0.get_y())) < EPS;
+    };
+};
 
-    // remove almost 0 or almost 1 and almost equals
-    std::vector<double> path_segment::organized_roots(std::vector<double> &x_roots, std::vector<double> &y_roots) {
-        std::vector<double> roots;
-        roots.insert(roots.end(), x_roots.begin(), x_roots.end());
-        roots.insert(roots.end(), y_roots.begin(), y_roots.end());
-        roots.push_back(0.f);
-        roots.push_back(1.f);
-        roots.erase(std::unique(roots.begin(), roots.end()), roots.end());
-        std::sort(roots.begin(), roots.end());
-        return roots;
-        // REMOVE LESS GREATER 0 1
+class cubic_p_segment : public path_segment {
+public:
+    inline cubic_p_segment(){
+    };
+    inline cubic_p_segment(const R2 p1, const R2 p2, const R2 p3, const R2 p4){
+        points.push_back(p1);
+        points.push_back(p2);
+        points.push_back(p3);
+        points.push_back(p4);
+        bbox.set(points);
+    };
+    inline static std::tuple<int, double, double> derivative_root(double a, double b, double c, double d){
+        // printf("achando raizes para: %.2f, %.2f, %.2f, %.2f\n", a, b, c, d);
+        int roots_number = 0;
+        double root1 = 0, root2 = 0;
+        double A = 3*d - 9*c + 9*b - 3*a;
+        double B = 6*c - 12*b + 6*a;
+        double C = 3*b - 3*a;
+        double delt = B*B - 4*A*C;
+        // printf("pegou raiz com delt %.2f e A:%.2f B:%.2f C:%.2f.\n", delt, A, B, C);
+        if(std::abs(A) > EPS){
+            if(delt > 0){
+                roots_number = 2;
+                double sqrt = std::sqrt(delt);
+                root1 = (-B+sqrt)/(2*A);
+                root2 = (-B-sqrt)/(2*A);
+            }
+            else if(delt == 0){
+                roots_number = 1;
+                root1 = -B/(2*A);
+                root2 = root1;
+            }
+            else{
+                roots_number = 0;
+            }
+        }
+        else{
+            roots_number = 1;
+            root1 = -C/B;
+            root2 = root1;
+        }
+        return std::make_tuple(roots_number, std::min(root1, root2), std::max(root1, root2));
+    };
+    inline double x_in_t(double t) const {
+        assert(points.size() > 3);
+        return points[0].get_x()*(1-t)*(1-t)*(1-t) + 
+               points[1].get_x()*3.0*(1-t)*(1-t)*t + 
+               points[2].get_x()*3.0*t*t*(1-t) + 
+               points[3].get_x()*t*t*t;
+    };
+    inline double y_in_t(double t) const {
+        assert(points.size() > 3);
+        return points[0].get_y()*(1-t)*(1-t)*(1-t) + 
+               points[1].get_y()*3.0*(1-t)*(1-t)*t + 
+               points[2].get_y()*3.0*t*t*(1-t) + 
+               points[3].get_y()*t*t*t;
+    };
+    inline R2 r2_in_t(double t) const {
+        return make_R2(x_in_t(t), y_in_t(t));
+    };
+    inline R2 blossom(double a, double b, double c) const {
+        assert(points.size()>3);
+        double x = (((1-a)*points[0].get_x() +
+                       (a)*points[1].get_x())*(1-b) +
+                    ((1-a)*points[1].get_x() +
+                       (a)*points[2].get_x())*(b)) * (1-c) + 
+                   (((1-a)*points[1].get_x() +
+                       (a)*points[2].get_x())*(1-b) +
+                    ((1-a)*points[2].get_x() +
+                       (a)*points[3].get_x())*(b)) * (c);
+        double y = (((1-a)*points[0].get_y() +
+                       (a)*points[1].get_y())*(1-b) +
+                    ((1-a)*points[1].get_y() +
+                       (a)*points[2].get_y())*(b)) * (1-c) + 
+                   (((1-a)*points[1].get_y() +
+                       (a)*points[2].get_y())*(1-b) +
+                    ((1-a)*points[2].get_y() +
+                       (a)*points[3].get_y())*(b)) * (c);
+        return make_R2(x, y);
+    };
+    inline cubic_p_segment* reparametrize(double t0, double t1) const {
+        R2 pP1 = r2_in_t(t0);
+        R2 pP2 = blossom(t0, t0, t1);
+        R2 pP3 = blossom(t0, t1, t1);
+        R2 pP4 = r2_in_t(t1);  
+        // printf("reparametrizou para (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f).\n",
+        // pP1.get_x(), pP1.get_y(), pP2.get_x(), pP2.get_y(), pP3.get_x(), pP3.get_y(), pP4.get_x(), pP4.get_y());
+        return new cubic_p_segment(pP1, pP2, pP3, pP4);
+    };
+    inline bool is_linear() const {
+        assert(points.size() == 4);
+        R2 p0 = points[0];
+        R2 p1 = points[1];
+        R2 p2 = points[2];
+        R2 p3 = points[3];
+        return std::abs((p1.get_x()-p0.get_x())*(p2.get_y()-p0.get_y())-(p2.get_x()-p0.get_x())*(p1.get_y()-p0.get_y())) < EPS
+            && std::abs((p1.get_x()-p0.get_x())*(p3.get_y()-p0.get_y())-(p3.get_x()-p0.get_x())*(p1.get_y()-p0.get_y())) < EPS
+            && std::abs((p1.get_x()-p2.get_x())*(p3.get_y()-p2.get_y())-(p3.get_x()-p2.get_x())*(p1.get_y()-p2.get_y())) < EPS;
     }
+};
 
-    linear_segment::linear_segment(R2 p1, R2 p2)
-        : path_segment() {
-        m_points.push_back(p1);
-        m_points.push_back(p2);
-    }
-
-    std::vector<R2> linear_segment::reparametrize(double t0, double t1) const {
-        std::vector<R2> r_points {(1.0-t0)*m_points[0] + t0*m_points[1], 
-                                  (1.0-t1)*m_points[0] + t1*m_points[1]};
-        return r_points;
-    }
-
-    std::vector<double> linear_segment::d_roots() const {
-        std::vector<double> r_roots;
-        return r_roots;
-    }
-
-    quadratic_segment::quadratic_segment(R2 p1, R2 p2, R2 p3)
-        : path_segment() {
-        m_points.push_back(p1);
-        m_points.push_back(p2);
-        m_points.push_back(p3);
-    }
-
-    std::vector<R2> quadratic_segment::reparametrize(double t0, double t1) const {
-        std::vector<R2> r_points;
-        r_points.push_back(blossom(t0, t0));
-        r_points.push_back(blossom(t0, t1));
-        r_points.push_back(blossom(t1, t1));
-        return r_points;
-    }
-
-    std::vector<double> quadratic_segment::d_roots() const {
-        // A = a - 2*b + c;
-        // B = a - b;
-        R2 A = m_points[0] - 2*m_points[1] + m_points[2];
-        R2 B = m_points[0] - m_points[1];
-        std::vector<double> x_roots = roots(A.get_x(), B.get_x());
-        std::vector<double> y_roots = roots(A.get_y(), B.get_y());
-        return organized_roots(x_roots, y_roots);
-    }
-
-    rational_quadratic_segment::rational_quadratic_segment(R2 p1, R2 p2, R2 p3, double w) 
-        : quadratic_segment(p1, p2, p3)
-        , den(make_R2(1.0, 1.0), make_R2(w, w), make_R2(1.0, 1.0)) {
+class rational_p_segment : public path_segment {
+private:
+    double m_w;
+public:
+    inline rational_p_segment(){
+    };
+    inline rational_p_segment(const R2 p1, const R2 p2, const R2 p3, double w){
+        // printf("criando racional (%.2f, %.2f) (%.2f, %.2f) (%.2f, %.2f) %.2f.\n",
+            // p1.get_x(), p1.get_y(), p2.get_x(), p2.get_y(), p3.get_x(), p3.get_y(), w);
+        points.push_back(p1);
+        points.push_back(p2);
+        points.push_back(p3);
+        bbox.set(points);
         m_w = w;
+    };
+    inline static std::tuple<int, double, double> derivative_root(double a, double b, double c, double w){
+        // printf("achando raizes racionais para: %.2f, %.2f, %.2f, %.2f\n", a, b, c, w);
+        int roots_number = 0;
+        double root1 = 0, root2 = 0;
+        double A = -2*a*w + 2*a + 2*w*c - 2*c;
+        double B = 4*a*w - 2*a - 4*b + 2*c;
+        double C = -2*a*w + 2*b;
+        double delt = B*B - 4*A*C;
+        // printf("pegou raiz com delt %.2f e A:%.2f B:%.2f C:%.2f.\n", delt, A, B, C);
+        if(std::abs(A) > EPS){
+            if(delt > 0){
+                roots_number = 2;
+                double sqrt = std::sqrt(delt);
+                root1 = (-B+sqrt)/(2*A);
+                root2 = (-B-sqrt)/(2*A);
+            }
+            else if(delt == 0){
+                roots_number = 1;
+                root1 = -B/(2*A);
+                root2 = root1;
+            }
+            else{
+                roots_number = 0;
+            }
+        }
+        else{
+            roots_number = 1;
+            root1 = -C/B;
+            root2 = root1;
+        }
+        return std::make_tuple(roots_number, std::min(root1, root2), std::max(root1, root2));
+    };
+    inline double x_in_t(double t) const {
+        quadratic_p_segment a(points[0], points[1], points[2]);
+        quadratic_p_segment b(make_R2(1,1), make_R2(m_w, m_w), make_R2(1, 1));
+        return a.x_in_t(t)/b.x_in_t(t);
+    };
+    inline double y_in_t(double t) const {
+    quadratic_p_segment a(points[0], points[1], points[2]);
+        quadratic_p_segment b(make_R2(1,1), make_R2(m_w, m_w), make_R2(1, 1));
+        return a.y_in_t(t)/b.y_in_t(t);
+    };
+    inline R2 r2_in_t(double t) const {
+        return make_R2(x_in_t(t), y_in_t(t));
+    };
+    inline rational_p_segment* reparametrize(double t0, double t1) const {
+        assert(points.size() == 3);
+        quadratic_p_segment* temp = new quadratic_p_segment(points[0], points[1], points[2]);
+        quadratic_p_segment* temp_repar = temp->reparametrize(t0, t1);
+        double w0 = quadratic_p_segment::val_in_quad_bezie(t0, 1.0, m_w, 1.0);
+        
+        double w1 = (1.0-t0)*((1.0-t1) + t1*m_w) + t0*((1.0-t1)*m_w + t1);
+
+        double w2 = quadratic_p_segment::val_in_quad_bezie(t1, 1.0, m_w, 1.0);
+        // printf("reparametrizou com w0:%.2f, w1:%.2f, w2:%.2f.\n", w0, w1, w2);
+        R2 rp1 = temp_repar->get_point(0);
+        R2 rp2 = temp_repar->get_point(1);
+        R2 rp3 = temp_repar->get_point(2);
+        R2 p1 = make_R2(rp1.get_x()/w0, rp1.get_y()/w0);
+        R2 p2 = make_R2(rp2.get_x()/sqrt(w0*w2), rp2.get_y()/sqrt(w0*w2));
+        R2 p3 = make_R2(rp3.get_x()/w2, rp3.get_y()/w2);
+        auto retu = new rational_p_segment(p1, p2, p3, w1/sqrt(w0*w2));
+        delete temp;
+        delete temp_repar;
+        return retu;
+    };
+    inline bool is_linear() const {
+        assert(points.size() == 3);
+        R2 p0 = points[0];
+        R2 p1 = points[1];
+        R2 p2 = points[2];
+        return std::abs((p1.get_x()-p0.get_x())*(p2.get_y()-p0.get_y())-(p2.get_x()-p0.get_x())*(p1.get_y()-p0.get_y())) < EPS
+            && m_w == 1;
     }
-
-    std::vector<R2> rational_quadratic_segment::reparametrize(double t0, double t1) const {
-        std::vector<R2> pp = quadratic_segment::reparametrize(t0, t1);
-        std::vector<R2> pw = den.reparametrize(t0, t1);
-        std::vector<R2> r_points;
-        r_points.push_back(make_R2(pp[0].get_x()/pw[0].get_x(), pp[0].get_y()/pw[0].get_y()));
-        r_points.push_back(make_R2(pp[1].get_x()/std::sqrt(pw[0].get_x()*pw[2].get_x()), 
-                                pp[1].get_y()/std::sqrt(pw[0].get_y()*pw[2].get_y())));
-        r_points.push_back(make_R2(pp[2].get_x()/pw[2].get_x(), pp[2].get_y()/pw[2].get_y()));
-        return r_points;
-    } 
-
-    std::vector<R2> rational_quadratic_segment::reparametrize_den(double t0, double t1) const {
-        std::vector<R2> w = den.reparametrize(t0, t1);
-        w[1] = make_R2(w[1].get_x()/std::sqrt(w[0].get_x()*w[2].get_x()),
-                       w[1].get_y()/std::sqrt(w[0].get_y()*w[2].get_y()));
-        w[0] = make_R2(1.0, 1.0);
-        w[2] = make_R2(1.0, 1.0);
-        return w;
+    inline void apply_xf(const xform& xf){
+        // printf("transformou racional.\n");
+        for(unsigned int i = 0; i < points.size(); i++){
+            points[i] = transform_point(points[i], xf);
+        }
+        bbox.set(points);
     }
-
-    std::vector<double> rational_quadratic_segment::d_roots() const {
-        // A = -2*a*w + 2*a + 2*w*c - 2*c;
-        // B = 4*a*w - 2*a - 4*b + 2*c;
-        // C = -2*a*w + 2*b;
-        R2 A = 2.0*(m_points[0] - m_points[2])*(1 - m_w); 
-        R2 B = 2.0*(m_points[0]*(2.0*m_w - 1) + m_points[2] - 2.0*m_points[1]);
-        R2 C = 2.0*(m_points[1] - m_points[0]*m_w);
-        std::vector<double> x_roots = roots(A.get_x(), B.get_x(), C.get_x());
-        std::vector<double> y_roots = roots(A.get_y(), B.get_y(), C.get_y());
-        return organized_roots(x_roots, y_roots);
-    }
-
-    cubic_segment::cubic_segment(R2 p1, R2 p2, R2 p3, R2 p4) 
-        : path_segment() {
-        m_points.push_back(p1);
-        m_points.push_back(p2);
-        m_points.push_back(p3);
-        m_points.push_back(p4);
-    }
-
-    std::vector<R2> cubic_segment::reparametrize(double t0, double t1) const {
-        std::vector<R2> r_points;
-        r_points.push_back(blossom(t0, t0, t0));
-        r_points.push_back(blossom(t0, t0, t1));
-        r_points.push_back(blossom(t0, t1, t1));
-        r_points.push_back(blossom(t1, t1, t1));
-        return r_points;
-    }
-
-    std::vector<double> cubic_segment::d_roots() const {
-        // A = 3*d - 9*c + 9*b - 3*a;
-        // B = 6*c - 12*b + 6*a;
-        // C = 3*b - 3*a;
-        R2 A = 3.0*m_points[3] - 9.0*m_points[2] + 9.0*m_points[1] - 3.0*m_points[0];
-        R2 B = 6.0*m_points[2] - 12.0*m_points[1] + 6.0*m_points[0];
-        R2 C = 3.0*m_points[1] - 3.0*m_points[0];
-        std::vector<double> x_roots = roots(A.get_x(), B.get_x(), C.get_x());
-        std::vector<double> y_roots = roots(A.get_y(), B.get_y(), C.get_y());
-        return organized_roots(x_roots, y_roots);
-    }
-
-} // end raw
-
-path_builder::path_builder(const xform& xf) 
-    : m_xf(xf) 
-    , m_last_move(make_R2(0, 0))
-{}
-
-path_builder::~path_builder() {
-    m_path.clear();
-}
-
-void path_builder::do_linear_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1) {
-    raw::linear_segment lin(make_R2(x0, y0), make_R2(x1, y1));
-    lin.apply(m_xf);
-    std::vector<R2> control_points = lin.reparametrize(0, 1);
-    m_path.push_back(new monotonic::linear_segment(control_points));
-}
-
-void path_builder::do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2) {
-    raw::quadratic_segment quad(make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2));
-    quad.apply(m_xf);
-    std::vector<double> roots = quad.d_roots();
-    for(unsigned int i = 0; i < roots.size()-1; i++) {
-        int j = (i+1)&roots.size();
-        m_path.push_back(new monotonic::quadratic_segment(quad.reparametrize(roots[i], roots[j])));
-    }
-}
-
-void path_builder::do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2) {
-    raw::rational_quadratic_segment rat(make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), w1);
-    rat.apply(m_xf);
-    std::vector<double> roots = rat.d_roots();
-    for(unsigned int i = 0; i < roots.size()-1; i++) {
-        int j = (i+1)&roots.size();
-        m_path.push_back(new monotonic::rational_quadratic_segment(rat.reparametrize(roots[i], roots[j]),
-                                                                   rat.reparametrize_den(roots[i], roots[j])));
-    }
-}
-
-void path_builder::do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3) {
-    raw::cubic_segment cubic(make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3));
-    cubic.apply(m_xf);
-    std::vector<double> roots = cubic.d_roots();
-    for(unsigned int i = 0; i < roots.size()-1; i++) {
-        int j = (i+1)&roots.size();
-        m_path.push_back(new monotonic::cubic_segment(cubic.reparametrize(roots[i], roots[j])));
-    }
-}
-
-void path_builder::do_begin_contour(rvgf x0, rvgf y0) {
-    m_last_move = make_R2(x0, y0);
-}
-
-void path_builder::do_end_open_contour(rvgf x0, rvgf y0) {
-    do_linear_segment(x0, y0, m_last_move.get_x(), m_last_move.get_y());
-}
-
-void path_builder::do_end_closed_contour(rvgf x0, rvgf y0) {
-    (void) x0;
-    (void) y0;
-}
+};
 
 class scene_object {
 private:
     RGBA8 color;
     e_winding_rule w_rule;
-    std::vector<monotonic::path_segment*> segments;
+    std::vector<path_segment*> segments;
+    bouding_box bbox;
 public:
-    inline scene_object(std::vector<monotonic::path_segment*> path, const paint &c, e_winding_rule w_r)
+    inline scene_object(std::vector<path_segment*> path, const paint &c, e_winding_rule w_r)
     :   w_rule(w_r) {
         segments = path;
         if(c.is_solid_color()){
@@ -590,20 +520,28 @@ public:
         return color;    
     };
     inline bool hit(const double x, const double y) const{
-        int sum = 0;
-        for(unsigned int i = 0; i < segments.size(); i++){
-            if(segments[i]->intersect(x, y)) {
-                sum += segments[i]->get_dir();
+        if(bbox.hit(x, y)){
+            int sum = 0;
+            for(unsigned int i = 0; i < segments.size(); i++){
+                sum += segments[i]->hit(x, y);
             }
-        }
-        if(w_rule == e_winding_rule::non_zero){
-            return (sum != 0);
-        }
-        else if(w_rule == e_winding_rule::odd){
-            return ((sum % 2)!= 0);
+            if(w_rule == e_winding_rule::non_zero){
+                return (sum != 0);
+            }
+            else if(w_rule == e_winding_rule::odd){
+                return ((sum % 2)!= 0);
+            }
         }
         return false;
     };
+    inline void print_info() const{
+        for(auto seg : segments){
+            seg->print();
+        }
+    };
+    inline void update_bbox(){
+        bbox.set(segments);
+    }
 };
 
 class accelerated {
@@ -613,7 +551,7 @@ public:
     {};
     inline ~accelerated()
     {};
-    inline void add_object(std::vector<monotonic::path_segment*> path, const paint &paint, e_winding_rule w_rule){
+    inline void add_object(std::vector<path_segment*> path, const paint &paint, e_winding_rule w_rule){
         scene_object* obj = new scene_object(path, paint, w_rule);
         objects.push_back(obj);
     };
@@ -624,6 +562,218 @@ public:
             objects[i] = NULL;
             delete obj;    
         }
+    };
+    inline void update_bbox(){
+        for(unsigned int i = 0; i < objects.size(); i++){
+            objects[i]->update_bbox();
+        }
+    }
+    inline void print_objects() const{
+        for (auto obj : objects){
+            obj->print_info();
+        }   
+    };
+};
+
+class path_builder final: public i_input_path<path_builder>{
+private:
+    friend i_input_path<path_builder>;
+    const xform& xf;
+    std::vector<path_segment*> &path;
+    R2 last_move; 
+    inline void do_linear_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1){
+        // printf("criando segmento linear.\n");
+        linear_p_segment* seg = new linear_p_segment(make_R2(x0, y0), make_R2(x1, y1));
+        seg->apply_xf(xf);
+        path.push_back(seg);
+    };
+    inline void do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1,rvgf x2, rvgf y2){
+        auto* complete = new quadratic_p_segment(make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2));
+        if(!complete->is_linear()){
+            complete->apply_xf(xf);
+            quadratic_p_segment* segment = NULL;
+            double tx = quadratic_p_segment::derivative_root(x0, x1, x2);
+            double ty = quadratic_p_segment::derivative_root(y0, y1, y2);
+            double t0 = std::min(tx, ty);
+            double t1 = std::max(tx, ty);
+            if(t0 > EPS){
+                segment = complete->reparametrize(0, t0);
+                path.push_back(segment);
+            }
+            if(t1 > EPS){
+                if(std::abs(t0-t1) > EPS){
+                    segment = complete->reparametrize(t0, t1);
+                    path.push_back(segment);
+                }
+                segment = complete->reparametrize(t1, 1);
+                path.push_back(segment);
+            }
+            else{
+                path.push_back(complete);
+            }
+        }
+        else{
+            // printf("fez linear a partir da quadratica: (%.2f, %.2f) (%.2f, %.2f).\n", x0, y0, x2, y2);
+            do_linear_segment(x0, y0, x2, y2);
+        }
+    }
+    inline void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2){
+        // printf("começou racional (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f).\n",
+                                // x0, y0, x1, y1, x2, y2, w1);
+        auto* complete = new rational_p_segment(make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), w1);
+        if(!complete->is_linear()) {
+            complete->apply_xf(xf);
+            // printf("x:");
+            auto roots_x = rational_p_segment::derivative_root(x0, x1, x2, w1);
+            // printf("y:"); 
+            auto roots_y = rational_p_segment::derivative_root(y0, y1, y2, w1);
+            std::vector<double> roots_t;
+            switch(std::get<0>(roots_x)){
+                case 1:
+                    // printf("raiz x: %.2f.\n", std::get<1>(roots_x));
+                    roots_t.push_back(std::get<1>(roots_x));
+                    break;
+                case 2:
+                    // printf("raizes x: %.2f, %.2f.\n", std::get<1>(roots_x), std::get<2>(roots_x));
+                    roots_t.push_back(std::get<1>(roots_x));
+                    roots_t.push_back(std::get<2>(roots_x));
+                    break;
+                default:
+                    break;
+            }
+            switch(std::get<0>(roots_y)){
+                case 1:
+                    // printf("raiz y: %.2f.\n", std::get<1>(roots_y));
+                    roots_t.push_back(std::get<1>(roots_y));
+                    break;
+                case 2:
+                    // printf("raizes y: %.2f, %.2f.\n", std::get<1>(roots_y), std::get<2>(roots_y));
+                    roots_t.push_back(std::get<1>(roots_y));
+                    roots_t.push_back(std::get<2>(roots_y));
+                    break;
+                default:
+                    break;
+            }
+            // printf("pontos: ");
+            for(auto it = roots_t.begin(); it != roots_t.end(); ++it){
+                // printf("%.2f\t", (*it));
+            }
+            // printf("\n");
+            for(int i = roots_t.size()-1; i >= 0; i--){
+                if(roots_t[i] >= 1.0f || roots_t[i] <= 0.0f){
+                    roots_t.erase(roots_t.begin() + i);
+                }
+            }
+            roots_t.push_back(0.f);
+            roots_t.push_back(1.f);
+            roots_t.erase(std::unique(roots_t.begin(), roots_t.end()), roots_t.end());
+            std::sort(roots_t.begin(), roots_t.end());
+            // printf("pontos filtrados: ");
+            for(auto it = roots_t.begin(); it != roots_t.end(); ++it){
+                // printf("%.2f\t", (*it));
+            }
+            // printf("\n");
+            for(unsigned int i = 0; i < roots_t.size()-1; i++){
+                int j = (i+1)%(roots_t.size());
+                // printf("criou segmento %.2f %.2f.\n", roots_t[i], roots_t[j]);
+                auto repar = complete->reparametrize(roots_t[i], roots_t[j]);
+                path.push_back(repar);
+            }
+            delete complete;
+        }
+        else{
+            // printf("fez linear a partir da racional: (%.2f, %.2f) (%.2f, %.2f).\n", x0, y0, x2, y2);
+            do_linear_segment(x0, y0, x2, y2);
+        }
+    };
+    inline void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3){
+        // printf("começou cubica (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f).\n",
+                                //x0, y0, x1, y1, x2, y2, x3, y3);
+        auto* complete = new cubic_p_segment(make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3));
+        if(!complete->is_linear()) {
+            complete->apply_xf(xf);
+            // printf("x:");
+            auto roots_x = cubic_p_segment::derivative_root(x0, x1, x2, x3);
+            // printf("y:"); 
+            auto roots_y = cubic_p_segment::derivative_root(y0, y1, y2, y3);
+            std::vector<double> roots_t;
+            switch(std::get<0>(roots_x)){
+                case 1:
+                    // printf("raiz x: %.2f.\n", std::get<1>(roots_x));
+                    roots_t.push_back(std::get<1>(roots_x));
+                    break;
+                case 2:
+                    // printf("raizes x: %.2f, %.2f.\n", std::get<1>(roots_x), std::get<2>(roots_x));
+                    roots_t.push_back(std::get<1>(roots_x));
+                    roots_t.push_back(std::get<2>(roots_x));
+                    break;
+                default:
+                    break;
+            }
+            switch(std::get<0>(roots_y)){
+                case 1:
+                    // printf("raiz y: %.2f.\n", std::get<1>(roots_y));
+                    roots_t.push_back(std::get<1>(roots_y));
+                    break;
+                case 2:
+                    // printf("raizes y: %.2f, %.2f.\n", std::get<1>(roots_y), std::get<2>(roots_y));
+                    roots_t.push_back(std::get<1>(roots_y));
+                    roots_t.push_back(std::get<2>(roots_y));
+                    break;
+                default:
+                    break;
+            }
+            // printf("pontos: ");
+            for(auto it = roots_t.begin(); it != roots_t.end(); ++it){
+                // printf("%.2f\t", (*it));
+            }
+            // printf("\n");
+            for(int i = roots_t.size()-1; i >= 0; i--){
+                if(roots_t[i] >= 1.0f || roots_t[i] <= 0.0f){
+                    roots_t.erase(roots_t.begin() + i);
+                }
+            }
+            roots_t.push_back(0.f);
+            roots_t.push_back(1.f);
+            roots_t.erase(std::unique(roots_t.begin(), roots_t.end()), roots_t.end());
+            std::sort(roots_t.begin(), roots_t.end());
+            // printf("pontos filtrados: ");
+            for(auto it = roots_t.begin(); it != roots_t.end(); ++it){
+                // printf("%.2f\t", (*it));
+            }
+            // printf("\n");
+            for(unsigned int i = 0; i < roots_t.size()-1; i++){
+                int j = (i+1)%(roots_t.size());
+                // printf("criou segmento %.2f %.2f.\n", roots_t[i], roots_t[j]);
+                path.push_back(complete->reparametrize(roots_t[i], roots_t[j]));
+            }
+        }
+        else{
+            // printf("fez linear a partir da cubica: (%.2f, %.2f) (%.2f, %.2f).\n", x0, y0, x3, y3);
+            do_linear_segment(x0, y0, x3, y3);
+        }
+    };
+    inline void do_begin_contour(rvgf x0, rvgf y0){
+        last_move = make_R2(x0, y0);
+    };
+    inline void do_end_open_contour(rvgf x0, rvgf y0){
+        do_linear_segment(x0, y0, last_move.get_x(), last_move.get_y());
+    };
+    inline void do_end_closed_contour(rvgf x0, rvgf y0){
+        (void) x0;
+        (void) y0;
+    };
+public:
+    inline path_builder(const xform& xf_, std::vector<path_segment*> &path_) 
+        : xf(xf_)
+        , path(path_)
+        , last_move(make_R2(0,0)) {
+        std::cout<<"";
+    };
+    inline ~path_builder()
+    {};
+    inline std::vector<path_segment*> get_path() const {
+        return path;
     };
 };
 
@@ -647,6 +797,7 @@ private:
         else return m_xf_stack.back();
     };
     inline void do_painted_shape(e_winding_rule wr, const shape &s, const paint &p){
+        std::vector<path_segment*> path;
         xform post;
         path_data::const_ptr path_data;
         if(s.is_path()){
@@ -664,9 +815,9 @@ private:
         else if(s.is_stroke()){
             path_data = s.as_path_data_ptr();
         }
-        path_builder _path_builder(post*top_xf()*s.get_xf());
+        path_builder _path_builder(post*top_xf()*s.get_xf(), path);
         path_data->iterate(_path_builder);
-        acc.add_object(_path_builder.get_path(), p, wr);
+        acc.add_object(path, p, wr);
     };
     inline void do_begin_transform(uint16_t depth, const xform &xf){
         (void) depth;
@@ -693,6 +844,9 @@ public:
     inline acc_builder(const xform &screen_xf){
         push_xf(screen_xf);
     };
+    inline void update_bbox(){
+        acc.update_bbox();
+    }
     inline accelerated get_acc() const{
         return acc;
     };
@@ -702,6 +856,7 @@ const accelerated accelerate(const scene &c, const window &w,
     const viewport &v) {
     acc_builder builder(make_windowviewport(w, v) * c.get_xf());
     c.get_scene_data().iterate(builder);
+    builder.update_bbox();
     return builder.get_acc();
 }
 

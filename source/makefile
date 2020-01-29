@@ -653,8 +653,6 @@ DIST_CPP_SRC := \
 	rvg-driver-cairo.cpp \
 	rvg-driver-cairo.h \
 	rvg-driver-png.cpp \
-	hadryan-path-builder.h \
-	hadryan-path-builder.cpp \
 	rvg-driver-png.h \
 	rvg-driver-eps.cpp \
 	rvg-driver-eps.h \
