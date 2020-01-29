@@ -3,4 +3,6 @@
 *.vcxproj
 *.sln
 *.so
+.vscode
 a.png
+bkp

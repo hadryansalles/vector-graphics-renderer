@@ -1,176 +1,10 @@
-
-#include <string>
-#include <sstream>
-#include <cmath>
-#include <memory>
-#include <assert.h>
-
-#include <lua.h>
-#include "rvg-lua.h"
-#include "rvg-pngio.h"
-#include "rvg-image.h"
-#include "rvg-shape.h"
-#include "rvg-paint.h"
-#include "rvg-rgba.h"
-#include "rvg-winding-rule.h"
-#include "rvg-xform-affinity.h"
-#include "rvg-i-input-path.h"
-#include "rvg-i-scene-data.h"
-#include "rvg-stroke-style.h"
-
-#include "rvg-input-path-f-xform.h"
-#include "rvg-rgba.h"
-
-#include "rvg-lua-facade.h"
-
-#include "rvg-driver-png.h"
+#include "hadryan-path-builder.h"
 
 #define EPS 0.0000000001
 
 namespace rvg {
     namespace driver {
-        namespace png { 
-
-class bouding_box {
-    private:
-        R2 m_p0;
-        R2 m_p1;
-    public:
-        bouding_box(std::vector<R2> &points);
-        bool hit_left(const double x, const double y) const;
-        bool hit_right(const double x, const double y) const;
-        bool hit_inside(const double x, const double y) const;
-};
-
-namespace monotonic {
-
-    class path_segment {
-    protected:
-        std::vector<R2> m_points; // control points
-        const bouding_box m_bbox; // segment bouding box
-        int m_dir;
-    public:
-        path_segment(std::vector<R2> points);
-        virtual ~path_segment();
-
-        R2 p_in_t(const double t) const;
-        virtual double x_in_t(const double t) const = 0;
-        virtual double y_in_t(const double t) const = 0;
-        bool intersect(const double x, const double y) const;
-        int get_dir() const;
-    };
-
-    class linear_segment : public path_segment {
-    public:
-        linear_segment(std::vector<R2> points); 
-        double x_in_t(const double t) const;
-        double y_in_t(const double t) const;
-    };
-
-    class quadratic_segment : public path_segment {
-    public:
-        quadratic_segment(std::vector<R2> points);  // POSSIBLE BUG
-        virtual double x_in_t(const double t) const;
-        virtual double y_in_t(const double t) const;
-    };
-
-    class rational_quadratic_segment : public quadratic_segment {
-    private: 
-        quadratic_segment den;
-    public:
-        rational_quadratic_segment(std::vector<R2> points, std::vector<R2> den_points); // ASSERT size = 2
-        double x_in_t(const double t) const;
-        double y_in_t(const double t) const;
-    };
-
-    class cubic_segment : public path_segment {
-    public:
-        cubic_segment(std::vector<R2> points);
-        double x_in_t(const double t) const;
-        double y_in_t(const double t) const;
-    };
-
-} // end monotonic
-
-namespace raw {
-
-    class path_segment {
-    protected:
-        std::vector<R2> m_points;
-        double m_w;
-
-        R2 blossom(double a, double b) const;
-        R2 blossom(double a, double b, double c) const;
-
-        static std::vector<double> roots(double A, double B);
-        static std::vector<double> roots(double A, double B, double C);
-        static std::vector<double> organized_roots(std::vector<double> &x_roots, std::vector<double> &y_roots);
-    
-    public:
-        path_segment();
-        virtual ~path_segment();
-
-        void apply(const xform& xf);
-        virtual std::vector<R2> reparametrize(double t0, double t1) const = 0;
-        virtual std::vector<double> d_roots() const = 0;
-    };
-
-    class linear_segment : public path_segment {
-    public:
-        linear_segment(R2 p1, R2 p2);
-        std::vector<R2> reparametrize(double t0, double t1) const;
-        std::vector<double> d_roots() const;
-    };
-
-    class quadratic_segment : public path_segment {
-    public:
-        quadratic_segment(R2 p1, R2 p2, R2 p3);
-        std::vector<R2> reparametrize(double t0, double t1) const;
-        std::vector<double> d_roots() const;
-    };
-
-    class rational_quadratic_segment : public quadratic_segment {
-    private:
-        quadratic_segment den;
-    public:
-        rational_quadratic_segment(R2 p1, R2 p2, R2 p3, double w);
-        std::vector<R2> reparametrize(double t0, double t1) const;
-        std::vector<R2> reparametrize_den(double t0, double t1) const;
-        std::vector<double> d_roots() const;
-    };
-
-    class cubic_segment : public path_segment {
-    public:
-        cubic_segment(R2 p1, R2 p2, R2 p3, R2 p4);
-        std::vector<R2> reparametrize(double t0, double t1) const;
-        std::vector<double> d_roots() const;
-    };
-
-} // end raw
-
-//  Iterates through path_data getting its parameters and creates a representation 
-//  with only monotonic segments
-class path_builder final : public i_input_path<path_builder>{
-    private:
-        friend i_input_path<path_builder>;
-        std::vector<monotonic::path_segment*> m_path;
-        const xform m_xf;
-        R2 m_last_move;
-        
-    public:
-        path_builder(const xform& xf);
-        ~path_builder();
-
-        std::vector<monotonic::path_segment*> get_path() const;
-
-        void do_linear_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1);
-        void do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2);
-        void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2);
-        void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3);
-        void do_begin_contour(rvgf x0, rvgf y0);
-        void do_end_open_contour(rvgf x0, rvgf y0);
-        void do_end_closed_contour(rvgf x0, rvgf y0);
-};
+        namespace png {
 
 
 bool almost_zero(const double& x) {
@@ -199,7 +33,7 @@ bool bouding_box::hit_inside(const double x, const double y) const {
 
 namespace monotonic {
 
-    path_segment::path_segment(std::vector<R2> points) 
+    path_segment::path_segment(std::vector<R2> &points) 
         : m_bbox(points) 
         , m_dir(1) { 
         for (auto point : points){
@@ -243,7 +77,7 @@ namespace monotonic {
         return m_dir;
     }
 
-    linear_segment::linear_segment(std::vector<R2> points)
+    linear_segment::linear_segment(std::vector<R2> &points)
         : path_segment(points) {
         assert(points.size() == 2);
     }
@@ -256,7 +90,7 @@ namespace monotonic {
         return t*m_points[0].get_y() + t*m_points[1].get_y();
     }
 
-    quadratic_segment::quadratic_segment(std::vector<R2> points)
+    quadratic_segment::quadratic_segment(std::vector<R2> &points)
         : path_segment(points){
             assert(points.size() == 3);
     }
@@ -269,7 +103,7 @@ namespace monotonic {
         return m_points[0].get_y()*(1-t)*(1-t) + m_points[1].get_y()*2*(t - t*t) + m_points[2].get_y()*t*t;
     }
 
-    rational_quadratic_segment::rational_quadratic_segment(std::vector<R2> points, std::vector<R2> den_points)
+    rational_quadratic_segment::rational_quadratic_segment(std::vector<R2> &points, std::vector<R2> &den_points)
         : quadratic_segment(points)
         , den(den_points) {
     }
@@ -282,7 +116,7 @@ namespace monotonic {
         return quadratic_segment::y_in_t(t)/den.y_in_t(t);
     }
 
-    cubic_segment::cubic_segment(std::vector<R2> points) 
+    cubic_segment::cubic_segment(std::vector<R2> &points) 
         : path_segment(points){
         assert(points.size() == 4);
     }
@@ -529,7 +363,7 @@ void path_builder::do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf
     std::vector<double> roots = quad.d_roots();
     for(unsigned int i = 0; i < roots.size()-1; i++) {
         int j = (i+1)&roots.size();
-        m_path.push_back(new monotonic::quadratic_segment(quad.reparametrize(roots[i], roots[j])));
+        m_path.push_back(new monotonic::quadratic_segment(quad.reparametrize[roots[i], roots[j]]));
     }
 }
 
@@ -539,8 +373,8 @@ void path_builder::do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf
     std::vector<double> roots = rat.d_roots();
     for(unsigned int i = 0; i < roots.size()-1; i++) {
         int j = (i+1)&roots.size();
-        m_path.push_back(new monotonic::rational_quadratic_segment(rat.reparametrize(roots[i], roots[j]),
-                                                                   rat.reparametrize_den(roots[i], roots[j])));
+        m_path.push_back(new monotonic::rational_quadratic_segment(rat.reparametrize[roots[i], roots[j]],
+                                                                   rat.reparametrize_den[roots[i], roots[j]]));
     }
 }
 
@@ -550,7 +384,7 @@ void path_builder::do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2,
     std::vector<double> roots = cubic.d_roots();
     for(unsigned int i = 0; i < roots.size()-1; i++) {
         int j = (i+1)&roots.size();
-        m_path.push_back(new monotonic::cubic_segment(cubic.reparametrize(roots[i], roots[j])));
+        m_path.push_back(new monotonic::cubic_segment(cubic.reparametrize[roots[i], roots[j]]));
     }
 }
 
@@ -567,226 +401,10 @@ void path_builder::do_end_closed_contour(rvgf x0, rvgf y0) {
     (void) y0;
 }
 
-class scene_object {
-private:
-    RGBA8 color;
-    e_winding_rule w_rule;
-    std::vector<monotonic::path_segment*> segments;
-public:
-    inline scene_object(std::vector<monotonic::path_segment*> path, const paint &c, e_winding_rule w_r)
-    :   w_rule(w_r) {
-        segments = path;
-        if(c.is_solid_color()){
-            color = c.get_solid_color();
-        }
-        else{
-            printf("INVALID PAINT TYPE");
-            color = RGBA8(0, 0, 0, 0);
-        }
-    };
-    inline ~scene_object()
-    {};
-    inline const RGBA8 get_color() const{
-        return color;    
-    };
-    inline bool hit(const double x, const double y) const{
-        int sum = 0;
-        for(unsigned int i = 0; i < segments.size(); i++){
-            if(segments[i]->intersect(x, y)) {
-                sum += segments[i]->get_dir();
-            }
-        }
-        if(w_rule == e_winding_rule::non_zero){
-            return (sum != 0);
-        }
-        else if(w_rule == e_winding_rule::odd){
-            return ((sum % 2)!= 0);
-        }
-        return false;
-    };
-};
+}}}
 
-class accelerated {
-public:
-    std::vector<scene_object*> objects;
-    inline accelerated()
-    {};
-    inline ~accelerated()
-    {};
-    inline void add_object(std::vector<monotonic::path_segment*> path, const paint &paint, e_winding_rule w_rule){
-        scene_object* obj = new scene_object(path, paint, w_rule);
-        objects.push_back(obj);
-    };
-    inline void destroy_objects(){
-        scene_object* obj;
-        for(unsigned int i = 0; i < objects.size(); i++){
-            obj = objects[i];
-            objects[i] = NULL;
-            delete obj;    
-        }
-    };
-};
-
-class acc_builder final: public i_scene_data<acc_builder> {
-private:
-    accelerated acc;
-    std::vector<xform> m_xf_stack;
-    friend i_scene_data<acc_builder>;
-    
-    inline void push_xf(const xform &xf){
-        m_xf_stack.push_back(top_xf() * xf);
-    };
-    inline void pop_xf(){
-        if (m_xf_stack.size() > 0) {
-            m_xf_stack.pop_back();
-        }
-    };
-    inline const xform &top_xf() const{
-        static xform id;
-        if (m_xf_stack.empty()) return id;
-        else return m_xf_stack.back();
-    };
-    inline void do_painted_shape(e_winding_rule wr, const shape &s, const paint &p){
-        xform post;
-        path_data::const_ptr path_data;
-        if(s.is_path()){
-            path_data = s.get_path_data_ptr();
-        }
-        else if(s.is_triangle()){
-            path_data = s.get_triangle_data().as_path_data_ptr(post);
-        }
-        else if(s.is_polygon()){
-            path_data = s.get_polygon_data().as_path_data_ptr(post);
-        }
-        else if(s.is_circle()){
-            path_data = s.get_circle_data().as_path_data_ptr(post);
-        }
-        else if(s.is_stroke()){
-            path_data = s.as_path_data_ptr();
-        }
-        path_builder _path_builder(post*top_xf()*s.get_xf());
-        path_data->iterate(_path_builder);
-        acc.add_object(_path_builder.get_path(), p, wr);
-    };
-    inline void do_begin_transform(uint16_t depth, const xform &xf){
-        (void) depth;
-        push_xf(xf);
-    };
-    inline void do_end_transform(uint16_t depth, const xform &xf){
-        (void) depth;
-        (void) xf;
-        pop_xf(); 
-    };
-    inline void do_tensor_product_patch(const patch<16,4> &tpp){(void) tpp;};
-    inline void do_coons_patch(const patch<12,4> &cp){(void) cp;};
-    inline void do_gouraud_triangle(const patch<3,3> &gt){(void) gt;};
-    inline void do_stencil_shape(e_winding_rule wr, const shape &s){(void) wr;(void) s;};
-    inline void do_begin_clip(uint16_t depth){(void) depth;};
-    inline void do_activate_clip(uint16_t depth){(void) depth;};
-    inline void do_end_clip(uint16_t depth){(void) depth;};
-    inline void do_begin_fade(uint16_t depth, unorm8 opacity){(void) depth;(void) opacity;};
-    inline void do_end_fade(uint16_t depth, unorm8 opacity){(void) depth;(void) opacity;};
-    inline void do_begin_blur(uint16_t depth, float radius){(void) depth;(void) radius;};
-    inline void do_end_blur(uint16_t depth, float radius){(void) depth;(void) radius;};
-
-public:
-    inline acc_builder(const xform &screen_xf){
-        push_xf(screen_xf);
-    };
-    inline accelerated get_acc() const{
-        return acc;
-    };
-};
-
-const accelerated accelerate(const scene &c, const window &w,
-    const viewport &v) {
-    acc_builder builder(make_windowviewport(w, v) * c.get_xf());
-    c.get_scene_data().iterate(builder);
-    return builder.get_acc();
-}
-
-RGBA8 sample(const accelerated& a, float x, float y){
-    for (auto obj = a.objects.rbegin(); obj != a.objects.rend(); ++obj){
-        if((*obj)->hit(x,y)){
-            return (*obj)->get_color();
-        }
-    }
-    return RGBA8(255, 255, 255, 255);
-}
-
-void render(accelerated &a, const window &w, const viewport &v,
-    FILE *out, const std::vector<std::string> &args) {
-    (void) w;
-    (void) args;
-    int xl, yb, xr, yt;
-    std::tie(xl, yb) = v.bl();
-    std::tie(xr, yt) = v.tr();
-    int width = xr - xl;
-    int height = yt - yb;
-
-    image<uint8_t, 4> out_image;
-    out_image.resize(width, height);
-
-    RGBA8 s_color;
-    for (int i = 1; i <= height; i++) {
-        float y = yb+i-1.+.5f;
-        for (int j = 1; j <= width; j++) {
-            printf("\r%.2f%%", 100*(double)(i*width+j)/(height*width));
-            float x = xl+j-1+.5f;
-            s_color  = sample(a, x, y);
-            out_image.set_pixel(j-1, i-1, s_color[0], s_color[1], s_color[2], s_color[3]);
-        }
-    }
-    printf("\n");
-    //a.print_objects();
-    a.destroy_objects();
-    store_png<uint8_t>(out, out_image);
-}
-
-} } } // namespace rvg::driver::png
-
-// Lua version of the accelerate function.
-// Since there is no acceleration, we simply
-// and return the input scene unmodified.
-static int luaaccelerate(lua_State *L) {
-    rvg_lua_push<rvg::driver::png::accelerated>(L,
-        rvg::driver::png::accelerate(
-            rvg_lua_check<rvg::scene>(L, 1),
-            rvg_lua_check<rvg::window>(L, 2),
-            rvg_lua_check<rvg::viewport>(L, 3)));
-    return 1;
-}
-
-// Lua version of render function
-static int luarender(lua_State *L) {
-    auto a = rvg_lua_check<rvg::driver::png::accelerated>(L, 1);
-    auto w = rvg_lua_check<rvg::window>(L, 2);
-    auto v = rvg_lua_check<rvg::viewport>(L, 3);
-    auto o = rvg_lua_optargs(L, 5);
-    rvg::driver::png::render(a, w, v, rvg_lua_check_file(L, 4), o);
-    return 0;
-}
-
-// List of Lua functions exported into driver table
-static const luaL_Reg modpngpng[] = {
-    {"render", luarender },
-    {"accelerate", luaaccelerate },
-    {NULL, NULL}
-};
-
-// Lua function invoked to be invoked by require"driver.png"
-extern "C"
-#ifndef _WIN32
-__attribute__((visibility("default")))
-#else
-__declspec(dllexport)
-#endif
-int luaopen_salles(lua_State *L) {
-    rvg_lua_init(L);
-    if (!rvg_lua_typeexists<rvg::driver::png::accelerated>(L, -1)) {
-        rvg_lua_createtype<rvg::driver::png::accelerated>(L,
-            "png accelerated", -1);
-    }
-    rvg_lua_facade_new_driver(L, modpngpng);
-    return 1;
-}
+// criar raw
+// aplicar xf
+// achar raizes
+// reparametrizar
+// conseguir paths monotonos
