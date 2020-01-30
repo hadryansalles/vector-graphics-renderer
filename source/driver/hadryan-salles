@@ -41,6 +41,7 @@ LP_LIB_Linux=$(shell $(PKG) --libs lapack)
 #---
 # Subset of targets to build
 #---
+vg_build_png=yes
 vg_build_strokers?=no
 vg_build_cairo?=no
 vg_build_qt5?=no
@@ -49,7 +50,6 @@ vg_build_distroke?=no
 vg_build_nvpr?=no
 vg_build_tests?=no
 vg_build_gperftools?=no
-
 #---
 # Probably no need to change anything below here
 #---
@@ -354,7 +354,6 @@ OBJ:= \
 
 TARGETS:= \
 	driver/rvg_cpp.so \
-	driver/png.so \
 	driver/rvg_lua.so \
 	driver/eps.so \
 	driver/svg.so \
