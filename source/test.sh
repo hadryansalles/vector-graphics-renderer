@@ -21,6 +21,7 @@ if [[ "$1" =~ "heavy" ]]; then
 fi
 
 [ ! -d $outputs ] && mkdir $outputs
+rm $outputs*
 START=$(date +%s.%N)
 for input in $inputs
 do
