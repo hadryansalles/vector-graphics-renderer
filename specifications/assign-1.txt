@@ -1,0 +1,105 @@
+2D Computer Graphics
+2020.0
+
+First assignment: Drawing ellipses, triangles, and polygons
+painted with opaque solid colors.
+-----------------------------------
+
+Now that we understand the RVG format, we will generate our
+first images from vector graphics illustrations. The only
+shapes these first examples contain are circles, triangles,
+and polygons. The only paints are opaque solid colors.
+
+To simplify the task, we provide a "skeleton" driver
+"png.lua" with two functions that you have to implement
+yourselves: "accelerate", and "sample".  Naturally, as you
+organize your code, these functions may invoke other
+functions you implemented as well.
+
+For example, running your modified "png.lua" on an input as
+such
+
+    luapp process.lua png triangle.rvg triangle.png
+
+should result in a color image "triangle.png" being created
+with an image of the corresponding to the illustration in
+"triangle.rvg".
+
+We took care of allocating an image with dimensions from the
+viewport, computing the coordinates of the center of each
+pixel, invoking your "sample" function for each pixel
+center, saving the results in each image pixel, and saving
+the image to disk.
+
+You can use your "accelerate" function to traverse the
+shapes in the scene (and in later assignments, the paints as
+well!) performing the actual transformations and perhaps
+changing the representation to help your "sample" function.
+Don't forget the window-viewport transformation.  Then,
+write the "sample" function so it traverses the
+transformed/accelerated scene and returns the color at the
+given pixel coordinates.
+
+Take a look at the drivers "svg.lua" and "rvg.lua". These
+are drivers that, instead of producing PNG files, produce
+SVG and RVG files, respectively. Feel free to investigate
+how they operate.
+
+For example, running "svg.lua" on an input as such
+
+    luapp process.lua svg triangle.rvg triangle.svg
+
+should result in an SVG file "triangle.svg" being created
+that represents the contents of the illustration in
+"triangle.rvg".
+
+We provide an archive containing a PNG image for each
+input. These images were generated with our own
+implementation of this assignment. Use them as ground truth.
+You can also generate SVGs from the RVGs using the driver we
+provide.  You can explore these using Inkscape if you want
+to see that they contain.
+
+Proceed in the following order.
+
+Start by getting the simple files to work
+
+    triangle1.rvg
+    triangle2.rvg
+    circle.rvg
+    polygon.rvg
+    eopolygon.rvg
+    quad1.rvg
+    icozahedron.rvg
+    xformedtriangle.rvg
+    xformedcircle.rvg
+    windowviewport1.rvg
+    windowviewport2.rvg
+
+The inside-outside test for circles, triangles, and polygons
+has been covered in class. Take a look at the Mathematica
+files if you have any doubts.
+
+As soon as you are done, these larger files should also work
+
+    lion.rvg
+    triangulatedlion.rvg
+    bunny.rvg
+    leopard.rvg
+
+These should take a *significant* amount of time to render.
+We will work on speeding up their computation in later
+assignments.
+
+Many of the remaining input files contain paths,
+transparency, or color gradients. We will learn about them
+in the following classes. Please don't worry about them for
+now.
+
+To hand in your assignment, rename your "png.lua" to
+"<first-name>-<last-name>.lua", where <first-name> is your
+first name, and <last-name> is your last name. Send the file
+to the TA as an attachment to an e-mail with the subject "[2dcg]
+Assignment 1".
+
+Good luck!

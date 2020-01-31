@@ -1,0 +1,80 @@
+2D Computer Graphics
+2020.0
+
+Second assignment: Drawing paths painted with opaque solid colors.
+-----------------------------------
+
+Now that you are familiar with Bézier curves and with our
+representation of paths, we can move on to more
+sophisticated shapes.
+
+Start by getting paths with linear segments to work
+
+    pathtriangle1.rvg
+    pathtriangle2.rvg
+    pathtriangle3.rvg
+    pathtriangle4.rvg
+    pathpolygon.rvg
+    patheopolygon.rvg
+    pathlion.rvg
+    quad2.rvg
+
+Then move on to paths that contain quadratic segments as
+well
+
+    quad3.rvg
+    parabola1.rvg
+    parabola2.rvg
+    parabola3.rvg
+    parabola4.rvg
+    parabola5.rvg
+    parabola6.rvg
+    hello-ttf.rvg
+
+Then work on cubics
+
+    quad4.rvg
+    cubic1.rvg
+    cubic2.rvg
+    cubic3.rvg
+    cubic4.rvg
+    cubic5.rvg
+    cubic6.rvg
+    cubic7.rvg
+    cubic8.rvg
+    cubic9.rvg
+    ampersand.rvg
+    hello_type1.rvg
+
+Finally work on rational quadratics
+
+    arc1.rvg
+    arc2.rvg
+    arc3.rvg
+    arc4.rvg
+    arc5.rvg
+
+As soon as you are done, these larger files should also work
+
+    puss-in-boots.rvg
+    pirate-with-knife.rvg
+    reschart.rvg
+    page.rvg
+
+These should take a *significant* amount of time to render.
+We will work on speeding up their computation in later
+assignments.
+
+Many of the remaining input files contain transparency or
+color gradients. We will learn about them in the following
+classes. Please don't worry about them for now.
+
+3) Handing in your assignment
+
+Create a directory with "<first-name>-<last-name>" where
+<first-name> is your first name, and <last-name> is your
+last name. Create a zip file "<first-name>-<last-name>.zip"
+with the contents.  Send the zip file to the TA as an attachment
+to an e-mail with the subject "[2dcg] Assignment 2".
+
+Good luck!

@@ -1,0 +1,101 @@
+2D Computer Graphics
+2020.0
+
+Third assignment: Drawing with transparency, linear gradients,
+and radial gradients
+-----------------------------------
+
+Now that you can render all shape primitives, it is time to
+enrich the paints to support semitransparent colors and
+spatially varying colors.  RVG only supports SVG gradients
+at the moment. No need to worry about PDF/PostScript
+gradients. However, make sure you read the SVG documentation
+on gradient paints. Do not trust the formulas on my class
+notes.
+
+1) First, another change in the way things work. We have
+been helping you out by having only 3 coordinates systems:
+the image coordinages in pixels, the scene coordinates, and
+the shape coordinates. The shape.xf moves from shape
+coordinates to scene coordinates, and the scene.xf moves
+from scene coordinates to image coordinates.
+
+The reality is that artists can nest as many coordinate
+systems as they want. To do so, they group objects together
+and define a transformation that operates on the group.
+Since these groups can be nested, you can see what happens.
+
+In your earlier assignments, you only implemented the
+painted_element() method when iterating over the scene
+contents. In this assignment, you must implement the
+begin_transformation() and end_transformation() methods as
+well. These methods notify you when a new transformation
+group starts and when it ends. You can use them to maintain
+the current transformation that maps from shape coordinates
+to screen coordinates (using a stack). You can then use this
+transformation in your accelerate() function.
+
+Check that your code works by testing examples
+
+    nestedxform1.rvg
+    nestedxform2.rvg
+
+2) Then get transparency to work. For now, forget the "fade"
+groups that can also exist in the scene. These will be
+considered in later assignments. Consider only the alpha
+channel (the "A" in sRGBA) of solid colors. Test the file
+
+    transparency.rvg
+
+When it works, you should also be able to render
+
+    dancer.rvg
+
+Now get the maps from R^2 to R working for both linear and
+radial gradients. One way to separate the gradient mapping
+from the ramp sampling is to implement an "identity" ramp
+that simply returns its argument in grayscale.  Make sure
+you implement all different spread methods.
+
+    lineargradient.rvg
+    ramp1.rvg
+    ramp2.rvg
+    ramp3.rvg
+    ramp4.rvg
+    radialgradient.rvg
+    ramp5.rvg
+    ramp6.rvg
+
+Observe that all paints (including solids) have their own
+global opacity value that has to be combined with the "A"
+component of the sRGBA value
+
+    transparentlineargradient.rvg
+    transparentradialgradient.rvg
+
+Finally, make sure the transformed gradients also work
+
+    xformedlineargradient.rvg
+    xformedradialgradient.rvg
+
+You can now render the prettiest images in the sample set
+
+    drops.rvg
+    embrace.rvg
+    eyes.rvg
+    penguin.rvg
+
+In the following assignments, we will work on acceleration
+and then on quality.
+
+2) Handing in your assignment
+
+Create a directory with "<first-name>-<last-name>" where
+<first-name> is your first name, and <last-name> is your
+last name. Place your file "render.lua" as well as all your
+new RVG test files inside this directory. Create a zip
+archive "<first-name>-<last-name>.zip" with the contents.
+Send the file to your TA as an attachment to an e-mail with
+the subject "[2dcg] Assignment 3".
+
+Good luck!
