@@ -19,6 +19,7 @@
 #include "rvg-i-monotonic-parameters.h"
 #include "rvg-input-path-f-xform.h"
 #include "rvg-input-path-f-monotonize.h"
+#include "rvg-input-path-f-close-contours.h"
 
 #include "rvg-i-scene-data.h"
 
@@ -26,7 +27,7 @@
 
 #include "rvg-driver-png.h"
 
-#define EPS 0.000000001
+#define EPS 0.0000000001
 
 namespace rvg {
     namespace driver {
@@ -36,200 +37,330 @@ bool almost_zero(const double& x) {
     return (std::abs(x) < EPS);
 }
 
-bouding_box::bouding_box(std::vector<R2> &points){
-    assert(points.size() > 1);
-    R2 first = points[0];
-    R2 last = points[points.size()-1];
-    m_p0 = make_R2(std::min(first.get_x(), last.get_x()), std::min(first.get_y(), last.get_y()));
-    m_p1 = make_R2(std::max(first.get_x(), last.get_x()), std::max(first.get_y(), last.get_y()));
-}
+class path_segment;
 
-bool bouding_box::hit_left(const double x, const double y) const {
-    return y >= m_p0.get_y() && y < m_p1.get_y() && x <= m_p0.get_x();
-}
-
-bool bouding_box::hit_right(const double x, const double y) const {
-    return y >= m_p0.get_y() && y < m_p1.get_y() && x > m_p1.get_x();
-}
-
-bool bouding_box::hit_inside(const double x, const double y) const {
-    return y >= m_p0.get_y() && y < m_p1.get_y() && x >= m_p0.get_x() && x < m_p1.get_x();
-}
-
-path_segment::path_segment(std::vector<R2> &points) 
-    : m_bbox(points) 
-    , m_dir(1) { 
-    for (auto point : points){
-        m_points.push_back(point);
+class bouding_box {
+private:
+    R2 m_p0;
+    R2 m_p1;
+public:
+    inline bouding_box(std::vector<R2> &points) {
+        assert(points.size() > 1);
+        R2 first = points[0];
+        R2 last = points[points.size()-1];
+        m_p0 = make_R2(std::min(first.get_x(), last.get_x()), std::min(first.get_y(), last.get_y()));
+        m_p1 = make_R2(std::max(first.get_x(), last.get_x()), std::max(first.get_y(), last.get_y()));
     }
-    if(m_points[0].get_y() > m_points[m_points.size()-1].get_y()){
-        m_dir = -1;
+    inline bouding_box(std::vector<path_segment*> &path);
+    inline bool hit_left(const double x, const double y) const {
+        return y >= m_p0.get_y() && y < m_p1.get_y() && x <= m_p0.get_x();
     }
-}
+    inline bool hit_right(const double x, const double y) const {
+        return y >= m_p0.get_y() && y < m_p1.get_y() && x > m_p1.get_x();
+    }
+    inline bool hit_inside(const double x, const double y) const {
+        return y >= m_p0.get_y() && y < m_p1.get_y() && x >= m_p0.get_x() && x < m_p1.get_x();
+    }
+};
 
-R2 path_segment::p_in_t(const double t) const {
-    return make_R2(x_in_t(t), y_in_t(t));
-}
-
-bool path_segment::intersect(const double x, const double y) const {
-    if(!m_bbox.hit_left(x, y)){
-        if(m_bbox.hit_right(x, y)){
-            return true;
+class path_segment {
+protected:
+    std::vector<R2> m_points; // control points
+    const bouding_box m_bbox; // segment bouding box
+    int m_dir;
+public:
+    inline path_segment(std::vector<R2> &points)
+        : m_bbox(points) 
+        , m_dir(1) { 
+        for (auto point : points){
+            m_points.push_back(point);
         }
-        else{
-            double bisection_y;
-            double step = 0.5;
-            double t = 0.5;
-            do {
-                step /= 2.0;
-                bisection_y = y_in_t(t); 
-                if(bisection_y > y){
-                    t += (double)m_dir*step;
-                }
-                else if(bisection_y < y){
-                    t -= (double)m_dir*step;
-                }
-            } while(bisection_y != y || step > 0.01);
-            return x-x_in_t(t) < EPS;
+        if(m_points[0].get_y() > m_points[m_points.size()-1].get_y()){
+            m_dir = -1;
         }
+    } 
+    inline virtual ~path_segment() {
+        m_points.clear();
     }
-    return 0;
+    inline R2 p_in_t(const double t) const {
+        return make_R2(x_in_t(t), y_in_t(t));
+    }
+    virtual double x_in_t(const double t) const = 0;
+    virtual double y_in_t(const double t) const = 0;
+    virtual void print() const = 0;
+    inline bool intersect(const double x, const double y) const {
+        if(!m_bbox.hit_right(x, y)){
+            if(m_bbox.hit_left(x, y)){
+                return true;
+            }
+            else if(m_bbox.hit_inside(x, y)){
+                double bisection_y;
+                double step = 0.5;
+                double t = 0.5;
+                do {
+                    step /= 2.0;
+                    bisection_y = y_in_t(t); 
+                    if(bisection_y > y){
+                        t -= (double)m_dir*step;
+                    }
+                    else if(bisection_y < y){
+                        t += (double)m_dir*step;
+                    }
+                } while(step > 0.0001);
+                return (x - x_in_t(t) < EPS);
+            }
+        }
+        return false;
+    }
+    inline int get_dir() const {
+        return m_dir;
+    }
+};
+
+bouding_box::bouding_box(std::vector<path_segment*> &path) {
+    assert(path.size() > 0);
+    m_p0 = path[0]->p_in_t(0);
+    m_p1 = path[0]->p_in_t(1);
+    for(auto seg : path){
+        R2 first = seg->p_in_t(0);
+        R2 last =  seg->p_in_t(1);
+        m_p0 = make_R2(std::min(m_p0[0], first[0]), std::min(m_p0[1], first[1]));
+        m_p0 = make_R2(std::min(m_p0[0],  last[0]), std::min(m_p0[1],  last[1]));
+        m_p1 = make_R2(std::max(m_p1[0], first[0]), std::max(m_p1[1], first[1]));
+        m_p1 = make_R2(std::max(m_p1[0],  last[0]), std::max(m_p1[1],  last[1]));
+    }
 }
 
-int path_segment::get_dir() const {
-    return m_dir;
-}
+class linear : public path_segment {
+public:
+    inline linear(std::vector<R2> &points)
+        : path_segment(points) {
+        assert(points.size() == 2);
+    } 
+    inline double x_in_t(const double t) const {
+        return (1-t)*m_points[0][0] + t*m_points[1][0];
+    }
+    inline double y_in_t(const double t) const {
+        return (1-t)*m_points[0][1] + t*m_points[1][1];
+    }
+    inline void print() const {
+        //printf("\tlin: (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1]);
+    }
+};
 
-linear_segment::linear_segment(std::vector<R2> &points)
-    : path_segment(points) {
-    assert(points.size() == 2);
-}
-
-double linear_segment::x_in_t(const double t) const {
-    return t*m_points[0].get_x() + t*m_points[1].get_x();
-}
-
-double linear_segment::y_in_t(const double t) const {
-    return t*m_points[0].get_y() + t*m_points[1].get_y();
-}
-
-quadratic_segment::quadratic_segment(std::vector<R2> &points)
-    : path_segment(points){
+class quadratic : public path_segment {
+public:
+    inline quadratic(std::vector<R2> &points) 
+        : path_segment(points){
         assert(points.size() == 3);
-}
+    }
+    inline virtual double x_in_t(const double t) const {
+        return m_points[0].get_x()*(1-t)*(1-t) + m_points[1].get_x()*2*(t - t*t) + m_points[2].get_x()*t*t;
+    }
+    inline virtual double y_in_t(const double t) const {
+        return m_points[0].get_y()*(1-t)*(1-t) + m_points[1].get_y()*2*(t - t*t) + m_points[2].get_y()*t*t;
+    }
+    inline virtual void print() const {
+        //printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
+    }
+};
 
-double quadratic_segment::x_in_t(const double t) const {
-    return m_points[0].get_x()*(1-t)*(1-t) + m_points[1].get_x()*2*(t - t*t) + m_points[2].get_x()*t*t;
-}
+class rational : public quadratic {
+private: 
+    quadratic den;
+public:
+    inline rational(std::vector<R2> &points, std::vector<R2> &den_points)
+        : quadratic(points)
+        , den(den_points) {
+    }
+    inline double x_in_t(const double t) const {
+        return quadratic::x_in_t(t)/den.x_in_t(t);
+    }
+    inline double y_in_t(const double t) const {
+        return quadratic::y_in_t(t)/den.y_in_t(t);
+    }
+};
 
-double quadratic_segment::y_in_t(const double t) const {
-    return m_points[0].get_y()*(1-t)*(1-t) + m_points[1].get_y()*2*(t - t*t) + m_points[2].get_y()*t*t;
-}
-
-rational_quadratic_segment::rational_quadratic_segment(std::vector<R2> &points, std::vector<R2> &den_points)
-    : quadratic_segment(points)
-    , den(den_points) {
-}
-
-double rational_quadratic_segment::x_in_t(const double t) const {
-    return quadratic_segment::x_in_t(t)/den.x_in_t(t);
-}
-
-double rational_quadratic_segment::y_in_t(const double t) const {
-    return quadratic_segment::y_in_t(t)/den.y_in_t(t);
-}
-
-cubic_segment::cubic_segment(std::vector<R2> &points) 
-    : path_segment(points){
-    assert(points.size() == 4);
-}
-
-double cubic_segment::x_in_t(const double t) const {
-    return m_points[0].get_x()*(1-t)*(1-t)*(1-t) + 
-        m_points[1].get_x()*3.0*(1-t)*(1-t)*t + 
-        m_points[2].get_x()*3.0*t*t*(1-t) + 
-        m_points[3].get_x()*t*t*t;
-}
-
-double cubic_segment::y_in_t(const double t) const {
-    return m_points[0].get_y()*(1-t)*(1-t)*(1-t) + 
-        m_points[1].get_y()*3.0*(1-t)*(1-t)*t + 
-        m_points[2].get_y()*3.0*t*t*(1-t) + 
-        m_points[3].get_y()*t*t*t;
-}
+class cubic : public path_segment {
+public:
+    inline cubic(std::vector<R2> &points)
+        : path_segment(points){
+        assert(points.size() == 4);
+    }
+    inline double x_in_t(const double t) const {
+        return m_points[0].get_x()*(1-t)*(1-t)*(1-t) + 
+            m_points[1].get_x()*3.0*(1-t)*(1-t)*t + 
+            m_points[2].get_x()*3.0*t*t*(1-t) + 
+            m_points[3].get_x()*t*t*t;
+    }
+    inline double y_in_t(const double t) const {
+        return m_points[0].get_y()*(1-t)*(1-t)*(1-t) + 
+            m_points[1].get_y()*3.0*(1-t)*(1-t)*t + 
+            m_points[2].get_y()*3.0*t*t*(1-t) + 
+            m_points[3].get_y()*t*t*t;
+    }
+    inline void print() const {
+        //printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
+    }
+};
 
 class scene_object {
 private:
     std::vector<path_segment*> m_path;
-    winding_rule m_wrule;
+    bouding_box m_bbox;
+    e_winding_rule m_wrule;
     RGBA8 m_color;
 public:
-    inline scene_object(std::vector<path_segment*> &path) {
+    inline scene_object(std::vector<path_segment*> &path, const e_winding_rule &wrule, const paint &paint) 
+        : m_bbox(path)
+        , m_wrule(wrule)
+        , m_color(paint.get_solid_color()) {
         m_path = path;
     };
     inline ~scene_object() {
+        m_path.clear();
+    }
+    inline void destroy() {
         for(auto seg : m_path) {
             delete seg;
             seg = NULL;
         }
-    };
+    }
     inline bool hit(const double x, const double y) const {
-        for(auto seg : m_path) {
-            
+        if(m_bbox.hit_inside(x, y)) { 
+            int sum = 0;
+            for(auto seg : m_path){
+                if(seg->intersect(x, y)) {
+                    sum += seg->get_dir();
+                }
+            }
+            if(m_wrule == e_winding_rule::non_zero){
+                return (sum != 0);
+            }
+            else if(m_wrule == e_winding_rule::odd){
+                return ((sum % 2)!= 0);
+            }
         }
-
-    };
+        return false;
+    }
+    inline RGBA8 get_color() const {
+        return m_color;
+    }
+    inline void print() const {
+        //printf("obj:\n");
+        for(auto seg : m_path){
+            seg->print();
+        }
+    }
 };
 
 class accelerated {
 public:
     std::vector<scene_object*> objects;
     inline accelerated()
-    {};
-    inline ~accelerated()
-    {};
-    inline void add(const paint &paint, e_winding_rule w_rule){
-        scene_object* obj = new scene_object();
-        objects.push_back(obj);
-    };
-    inline void destroy_objects(){
-        scene_object* obj;
-        for(unsigned int i = 0; i < objects.size(); i++){
-            obj = objects[i];
-            objects[i] = NULL;
-            delete obj;    
+    {}
+    inline ~accelerated() {
+        objects.clear();
+    }
+    inline void destroy() { 
+        for(auto obj : objects) {
+            obj->destroy();
+            delete obj;
+            obj = NULL;
         }
-    };
+    }
+    inline void add(scene_object* obj){
+        objects.push_back(obj);
+    }
+    inline void print() const {
+        for(auto obj : objects) {
+            obj->print();
+        }
+    }
 };
 
 class monotonic_builder final: public i_input_path<monotonic_builder> {
 friend i_input_path<monotonic_builder>;
+    std::vector<path_segment*> m_path;
+    R2 m_last_move;
 public:
     inline monotonic_builder() 
+        : m_last_move(make_R2(0, 0))
     {};
     inline ~monotonic_builder()
     {};
     inline void do_linear_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1){
-        printf("lin : (%.2f,%.2f), (%.2f,%.2f).\n", x0, y0, x1, y1);
+        // printf("lin : (%.2f,%.2f), (%.2f,%.2f).\n", x0, y0, x1, y1);
+        std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1)};
+        m_path.push_back(new linear(points));
     };
     inline void do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1,rvgf x2, rvgf y2){
-        printf("quad : (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", x0, y0, x1, y1, x2, y2);
+        // printf("quad : (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", x0, y0, x1, y1, x2, y2);
+        std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
+        if(!are_collinear(points)){
+            m_path.push_back(new quadratic(points));
+        }
+        else{
+            // printf("collinearize to ");
+            do_linear_segment(points[0][0], points[0][1], points[2][0], points[2][1]);
+        }
     }
     inline void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2){
-        printf("rat quad : (%.2f,%.2f), (%.2f,%.2f), %.2f, (%.2f,%.2f).\n", x0, y0, x1, y1, w1, x2, y2);
+        //printf("rat quad : (%.2f,%.2f), (%.2f,%.2f), %.2f, (%.2f,%.2f).\n", x0, y0, x1, y1, w1, x2, y2);
+        std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
+        if(are_collinear(points) && w1 == 1){
+            // printf("collinearize to ");   
+            do_linear_segment(points[0][0], points[0][1], points[2][0], points[2][1]);
+        }
+        else{
+            std::vector<R2> den{make_R2(1, 1), make_R2(w1, w1), make_R2(1, 1)};
+            m_path.push_back(new rational(points, den));    
+        }
+
     };
     inline void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3){
-        printf("cubic : (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", x0, y0, x1, y1, x2, y2, x3, y3);
+        // printf("cubic : (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", x0, y0, x1, y1, x2, y2, x3, y3);
+        std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3)};
+        if(!are_collinear(points)){
+            m_path.push_back(new cubic(points));
+        }
+        else{
+            // printf("collinearize to ");
+            do_linear_segment(points[0][0], points[0][1], points[3][0], points[3][1]);
+        }
     };
     inline void do_begin_contour(rvgf x0, rvgf y0){
-        printf("begin : (%.2f,%.2f).\n", x0, y0);
+        //printf("begin : (%.2f,%.2f).\n", x0, y0);
+        m_last_move = make_R2(x0, y0);
     };
     inline void do_end_open_contour(rvgf x0, rvgf y0){
-        printf("end open : (%.2f,%.2f).\n", x0, y0);
+        //printf("end open : (%.2f,%.2f).\n", x0, y0);
+        this->do_linear_segment(x0, y0, m_last_move[0], m_last_move[1]);
     };
     inline void do_end_closed_contour(rvgf x0, rvgf y0){
-        printf("end closed : (%.2f,%.2f).\n", x0, y0);
+        //printf("end closed : (%.2f,%.2f).\n", x0, y0);
     };
+    std::vector<path_segment*>& get() {
+        return m_path;
+    } 
+    inline static bool are_collinear(std::vector<R2> &points) {
+        int size = points.size();
+        for(int i = 0; i < size; i++) {
+            R2 p1 = points[i];
+            for(int j = i+1; j < size; j++) {
+                R2 p2 = points[j];
+                for(int k = j+1; k < size; k++) { 
+                    R2 p3 = points[k];
+                    double r1 = (p2[0] - p1[0])*(p3[1] - p1[1]);
+                    double r2 = (p3[0] - p1[0])*(p2[1] - p1[1]);
+                    if(!almost_zero(r1-r2)){
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
 };
 
 class accelerated_builder final: public i_scene_data<accelerated_builder> {
@@ -255,10 +386,10 @@ private:
         xform post;
         monotonic_builder path_builder;
         path_data::const_ptr path_data = s.as_path_data_ptr(post);
-        // monotonize
-        path_data->iterate(make_input_path_f_xform(post*top_xf()*s.get_xf(), 
-                           make_input_path_f_monotonize(path_builder)));
-        acc.add(p, wr);
+        path_data->iterate(make_input_path_f_close_contours(
+                           make_input_path_f_xform(post*top_xf()*s.get_xf(),
+                           make_input_path_f_monotonize(path_builder))));
+        acc.add(new scene_object(path_builder.get(), wr, p));
     };
 
     inline void do_begin_transform(uint16_t depth, const xform &xf){
@@ -302,7 +433,9 @@ const accelerated accelerate(const scene &c, const window &w,
 
 RGBA8 sample(const accelerated& a, float x, float y){
     for (auto obj = a.objects.rbegin(); obj != a.objects.rend(); ++obj){
-        
+        if((*obj)->hit(x,y)){
+            return (*obj)->get_color();
+        }
     }
     return RGBA8(255, 255, 255, 255);
 }
@@ -331,8 +464,8 @@ void render(accelerated &a, const window &w, const viewport &v,
         }
     }
     std::cout <<("\n");
-    a.destroy_objects();
     store_png<uint8_t>(out, out_image);
+    a.destroy();
 }
 
 } } } // namespace rvg::driver::png
