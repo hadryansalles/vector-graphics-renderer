@@ -137,7 +137,7 @@ public:
         assert(points.size() == 2);
     } 
     inline void print() const {
-        //printf("\tlin: (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1]);
+        printf("\tlin: (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1]);
     }
     inline double in_t(const int i, const double t) const {
         return (1-t)*m_points[0][i] + t*m_points[1][i];
@@ -411,12 +411,19 @@ const accelerated accelerate(const scene &c, const window &w,
 }
 
 RGBA8 sample(const accelerated& a, float x, float y){
-    for (auto obj = a.objects.rbegin(); obj != a.objects.rend(); ++obj){
-        if((*obj)->hit(x,y)){
-            return (*obj)->get_color();
+    RGBA8 s_color = make_rgba8(255, 255, 255, 255);
+    for (auto obj : a.objects){
+        if(obj->hit(x, y)){
+            RGBA8 color = obj->get_color(); 
+            s_color = make_rgba8 (
+                (int)color[0] + (1.0-(int)color[3]/255.0)*(int)s_color[0],
+                (int)color[1] + (1.0-(int)color[3]/255.0)*(int)s_color[1],
+                (int)color[2] + (1.0-(int)color[3]/255.0)*(int)s_color[2],
+                (int)color[3] + (1.0-(int)color[3]/255.0)*(int)s_color[3]
+            );
         }
     }
-    return RGBA8(255, 255, 255, 255);
+    return s_color;
 }
 
 void render(accelerated &a, const window &w, const viewport &v,
