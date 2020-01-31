@@ -32,16 +32,152 @@ namespace rvg {
     namespace driver {
         namespace png {
 
+bool almost_zero(const double& x) {
+    return (std::abs(x) < EPS);
+}
+
+bouding_box::bouding_box(std::vector<R2> &points){
+    assert(points.size() > 1);
+    R2 first = points[0];
+    R2 last = points[points.size()-1];
+    m_p0 = make_R2(std::min(first.get_x(), last.get_x()), std::min(first.get_y(), last.get_y()));
+    m_p1 = make_R2(std::max(first.get_x(), last.get_x()), std::max(first.get_y(), last.get_y()));
+}
+
+bool bouding_box::hit_left(const double x, const double y) const {
+    return y >= m_p0.get_y() && y < m_p1.get_y() && x <= m_p0.get_x();
+}
+
+bool bouding_box::hit_right(const double x, const double y) const {
+    return y >= m_p0.get_y() && y < m_p1.get_y() && x > m_p1.get_x();
+}
+
+bool bouding_box::hit_inside(const double x, const double y) const {
+    return y >= m_p0.get_y() && y < m_p1.get_y() && x >= m_p0.get_x() && x < m_p1.get_x();
+}
+
+path_segment::path_segment(std::vector<R2> &points) 
+    : m_bbox(points) 
+    , m_dir(1) { 
+    for (auto point : points){
+        m_points.push_back(point);
+    }
+    if(m_points[0].get_y() > m_points[m_points.size()-1].get_y()){
+        m_dir = -1;
+    }
+}
+
+R2 path_segment::p_in_t(const double t) const {
+    return make_R2(x_in_t(t), y_in_t(t));
+}
+
+bool path_segment::intersect(const double x, const double y) const {
+    if(!m_bbox.hit_left(x, y)){
+        if(m_bbox.hit_right(x, y)){
+            return true;
+        }
+        else{
+            double bisection_y;
+            double step = 0.5;
+            double t = 0.5;
+            do {
+                step /= 2.0;
+                bisection_y = y_in_t(t); 
+                if(bisection_y > y){
+                    t += (double)m_dir*step;
+                }
+                else if(bisection_y < y){
+                    t -= (double)m_dir*step;
+                }
+            } while(bisection_y != y || step > 0.01);
+            return x-x_in_t(t) < EPS;
+        }
+    }
+    return 0;
+}
+
+int path_segment::get_dir() const {
+    return m_dir;
+}
+
+linear_segment::linear_segment(std::vector<R2> &points)
+    : path_segment(points) {
+    assert(points.size() == 2);
+}
+
+double linear_segment::x_in_t(const double t) const {
+    return t*m_points[0].get_x() + t*m_points[1].get_x();
+}
+
+double linear_segment::y_in_t(const double t) const {
+    return t*m_points[0].get_y() + t*m_points[1].get_y();
+}
+
+quadratic_segment::quadratic_segment(std::vector<R2> &points)
+    : path_segment(points){
+        assert(points.size() == 3);
+}
+
+double quadratic_segment::x_in_t(const double t) const {
+    return m_points[0].get_x()*(1-t)*(1-t) + m_points[1].get_x()*2*(t - t*t) + m_points[2].get_x()*t*t;
+}
+
+double quadratic_segment::y_in_t(const double t) const {
+    return m_points[0].get_y()*(1-t)*(1-t) + m_points[1].get_y()*2*(t - t*t) + m_points[2].get_y()*t*t;
+}
+
+rational_quadratic_segment::rational_quadratic_segment(std::vector<R2> &points, std::vector<R2> &den_points)
+    : quadratic_segment(points)
+    , den(den_points) {
+}
+
+double rational_quadratic_segment::x_in_t(const double t) const {
+    return quadratic_segment::x_in_t(t)/den.x_in_t(t);
+}
+
+double rational_quadratic_segment::y_in_t(const double t) const {
+    return quadratic_segment::y_in_t(t)/den.y_in_t(t);
+}
+
+cubic_segment::cubic_segment(std::vector<R2> &points) 
+    : path_segment(points){
+    assert(points.size() == 4);
+}
+
+double cubic_segment::x_in_t(const double t) const {
+    return m_points[0].get_x()*(1-t)*(1-t)*(1-t) + 
+        m_points[1].get_x()*3.0*(1-t)*(1-t)*t + 
+        m_points[2].get_x()*3.0*t*t*(1-t) + 
+        m_points[3].get_x()*t*t*t;
+}
+
+double cubic_segment::y_in_t(const double t) const {
+    return m_points[0].get_y()*(1-t)*(1-t)*(1-t) + 
+        m_points[1].get_y()*3.0*(1-t)*(1-t)*t + 
+        m_points[2].get_y()*3.0*t*t*(1-t) + 
+        m_points[3].get_y()*t*t*t;
+}
+
 class scene_object {
 private:
+    std::vector<path_segment*> m_path;
+    winding_rule m_wrule;
+    RGBA8 m_color;
 public:
-    inline scene_object() {
-        std::cout << "obj.\n";
+    inline scene_object(std::vector<path_segment*> &path) {
+        m_path = path;
     };
-    inline ~scene_object()
-    {};
+    inline ~scene_object() {
+        for(auto seg : m_path) {
+            delete seg;
+            seg = NULL;
+        }
+    };
     inline bool hit(const double x, const double y) const {
-        return false;
+        for(auto seg : m_path) {
+            
+        }
+
     };
 };
 
