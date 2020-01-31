@@ -4,7 +4,7 @@ local rvg = {}
 local sqrt3 = 1.7320508
 rvg.scene = scene{
   fill(path{M,100,100,L,50*(2+sqrt3),150,R,50,150,0.5,50*(2-sqrt3),150,Z}, rgb8(255,0,0)),
-}:translated(100.5,5.5-100):rotated(45)
+}:translated(5.5,5.5-50)
 
 rvg.window = window(0,0,210,210)
 

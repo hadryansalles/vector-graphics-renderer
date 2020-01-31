@@ -8,10 +8,18 @@ heavy=("blue_butterfly"
        "anatomical_heart"
        "page_1"
        "page_2"
-       "paris-30k")
+       "paris-30k"
+       "blender_freestyle"
+       "bunny_dense_flat"
+       "colorado"
+       "contour"
+       "hawaii"
+       "roads")
+
 if [[ "$1" =~ "heavy" ]]; then
     heavy=()
 fi
+
 [ ! -d $outputs ] && mkdir $outputs
 START=$(date +%s.%N)
 for input in $inputs
