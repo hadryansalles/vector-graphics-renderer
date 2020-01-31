@@ -1,15 +1,29 @@
 #!/bin/bash
 inputs=`ls ../rvgs/*.rvg`
+outputs="../pngs-out/"
 driver='driver.png'
 program='process.lua'
 lua='luapp5.3'
-
+heavy=("blue_butterfly"
+       "anatomical_heart"
+       "page_1"
+       "page_2"
+       "paris-30k")
+if [[ "$1" =~ "heavy" ]]; then
+    heavy=()
+fi
+[ ! -d $outputs ] && mkdir $outputs
+START=$(date +%s.%N)
 for input in $inputs
 do
     filename=$(basename -- "$input")
     extension="${filename##*.}"
     filename="${filename%.*}"
-    [ ! -d "../png-out" ] && mkdir ../png-out
-    output="../png-out/"$filename".png" 
-    $lua $program $driver $input $output
+    output=$outputs$filename".png" 
+    if [[ ! " ${heavy[@]} " =~ " ${filename} " ]]; then
+        $lua $program $driver $input $output
+    fi
 done
+END=$(date +%s.%N)
+DIFF=$(echo "$END - $START" | bc)
+echo "TOTAL TIME: $DIFF"
