@@ -3,5 +3,6 @@
 *.vcxproj
 *.sln
 *.so
+pngs-out
 .vscode
 a.png
