@@ -82,11 +82,10 @@ public:
     inline virtual ~path_segment() {
         m_points.clear();
     }
-    inline R2 p_in_t(const double t) const {
-        return make_R2(x_in_t(t), y_in_t(t));
+    inline R2 bezier(const double t) const {
+        return make_R2(in_t(0, t), in_t(1, t));
     }
-    virtual double x_in_t(const double t) const = 0;
-    virtual double y_in_t(const double t) const = 0;
+    virtual double in_t(const int i, const double t) const = 0;
     virtual void print() const = 0;
     inline bool intersect(const double x, const double y) const {
         if(!m_bbox.hit_right(x, y)){
@@ -94,20 +93,20 @@ public:
                 return true;
             }
             else if(m_bbox.hit_inside(x, y)){
-                double bisection_y;
+                R2 bisection_point;
                 double step = 0.5;
                 double t = 0.5;
                 do {
                     step /= 2.0;
-                    bisection_y = y_in_t(t); 
-                    if(bisection_y > y){
+                    bisection_point = bezier(t); 
+                    if(bisection_point[1] > y){
                         t -= (double)m_dir*step;
                     }
-                    else if(bisection_y < y){
+                    else if(bisection_point[1] < y){
                         t += (double)m_dir*step;
                     }
                 } while(step > 0.0001);
-                return (x - x_in_t(t) < EPS);
+                return (x - bisection_point[0] < EPS);
             }
         }
         return false;
@@ -119,11 +118,11 @@ public:
 
 bouding_box::bouding_box(std::vector<path_segment*> &path) {
     assert(path.size() > 0);
-    m_p0 = path[0]->p_in_t(0);
-    m_p1 = path[0]->p_in_t(1);
+    m_p0 = path[0]->bezier(0);
+    m_p1 = path[0]->bezier(1);
     for(auto seg : path){
-        R2 first = seg->p_in_t(0);
-        R2 last =  seg->p_in_t(1);
+        R2 first = seg->bezier(0);
+        R2 last =  seg->bezier(1);
         m_p0 = make_R2(std::min(m_p0[0], first[0]), std::min(m_p0[1], first[1]));
         m_p0 = make_R2(std::min(m_p0[0],  last[0]), std::min(m_p0[1],  last[1]));
         m_p1 = make_R2(std::max(m_p1[0], first[0]), std::max(m_p1[1], first[1]));
@@ -137,14 +136,11 @@ public:
         : path_segment(points) {
         assert(points.size() == 2);
     } 
-    inline double x_in_t(const double t) const {
-        return (1-t)*m_points[0][0] + t*m_points[1][0];
-    }
-    inline double y_in_t(const double t) const {
-        return (1-t)*m_points[0][1] + t*m_points[1][1];
-    }
     inline void print() const {
         //printf("\tlin: (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1]);
+    }
+    inline double in_t(const int i, const double t) const {
+        return (1-t)*m_points[0][i] + t*m_points[1][i];
     }
 };
 
@@ -154,30 +150,27 @@ public:
         : path_segment(points){
         assert(points.size() == 3);
     }
-    inline virtual double x_in_t(const double t) const {
-        return m_points[0].get_x()*(1-t)*(1-t) + m_points[1].get_x()*2*(t - t*t) + m_points[2].get_x()*t*t;
-    }
-    inline virtual double y_in_t(const double t) const {
-        return m_points[0].get_y()*(1-t)*(1-t) + m_points[1].get_y()*2*(t - t*t) + m_points[2].get_y()*t*t;
+    inline virtual double in_t(const int i, const double t) const {
+        return m_points[0][i]*(1-t)*(1-t) + m_points[1][i]*2*(t - t*t) + m_points[2][i]*t*t;
     }
     inline virtual void print() const {
-        //printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
+        printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
     }
 };
 
-class rational : public quadratic {
-private: 
+class rational : public quadratic { 
     quadratic den;
 public:
     inline rational(std::vector<R2> &points, std::vector<R2> &den_points)
         : quadratic(points)
         , den(den_points) {
     }
-    inline double x_in_t(const double t) const {
-        return quadratic::x_in_t(t)/den.x_in_t(t);
+    inline void print() const {
+        quadratic::print();
+        den.print();
     }
-    inline double y_in_t(const double t) const {
-        return quadratic::y_in_t(t)/den.y_in_t(t);
+    inline double in_t(const int i, const double t) const {
+        return quadratic::in_t(i, t)/den.in_t(i, t);
     }
 };
 
@@ -187,20 +180,14 @@ public:
         : path_segment(points){
         assert(points.size() == 4);
     }
-    inline double x_in_t(const double t) const {
-        return m_points[0].get_x()*(1-t)*(1-t)*(1-t) + 
-            m_points[1].get_x()*3.0*(1-t)*(1-t)*t + 
-            m_points[2].get_x()*3.0*t*t*(1-t) + 
-            m_points[3].get_x()*t*t*t;
-    }
-    inline double y_in_t(const double t) const {
-        return m_points[0].get_y()*(1-t)*(1-t)*(1-t) + 
-            m_points[1].get_y()*3.0*(1-t)*(1-t)*t + 
-            m_points[2].get_y()*3.0*t*t*(1-t) + 
-            m_points[3].get_y()*t*t*t;
-    }
     inline void print() const {
-        //printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
+        printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
+    }
+    inline double in_t(const int i, const double t) const {
+        return m_points[0][i]*(1-t)*(1-t)*(1-t) + 
+            m_points[1][i]*3.0*(1-t)*(1-t)*t + 
+            m_points[2][i]*3.0*t*t*(1-t) + 
+            m_points[3][i]*t*t*t;
     }
 };
 
@@ -247,7 +234,7 @@ public:
         return m_color;
     }
     inline void print() const {
-        //printf("obj:\n");
+        printf("obj:\n");
         for(auto seg : m_path){
             seg->print();
         }
@@ -290,26 +277,21 @@ public:
     inline ~monotonic_builder()
     {};
     inline void do_linear_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1){
-        // printf("lin : (%.2f,%.2f), (%.2f,%.2f).\n", x0, y0, x1, y1);
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1)};
         m_path.push_back(new linear(points));
     };
     inline void do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1,rvgf x2, rvgf y2){
-        // printf("quad : (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", x0, y0, x1, y1, x2, y2);
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
         if(!are_collinear(points)){
             m_path.push_back(new quadratic(points));
         }
         else{
-            // printf("collinearize to ");
             do_linear_segment(points[0][0], points[0][1], points[2][0], points[2][1]);
         }
     }
     inline void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2){
-        //printf("rat quad : (%.2f,%.2f), (%.2f,%.2f), %.2f, (%.2f,%.2f).\n", x0, y0, x1, y1, w1, x2, y2);
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
         if(are_collinear(points) && w1 == 1){
-            // printf("collinearize to ");   
             do_linear_segment(points[0][0], points[0][1], points[2][0], points[2][1]);
         }
         else{
@@ -319,26 +301,23 @@ public:
 
     };
     inline void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3){
-        // printf("cubic : (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", x0, y0, x1, y1, x2, y2, x3, y3);
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3)};
         if(!are_collinear(points)){
             m_path.push_back(new cubic(points));
         }
         else{
-            // printf("collinearize to ");
             do_linear_segment(points[0][0], points[0][1], points[3][0], points[3][1]);
         }
     };
     inline void do_begin_contour(rvgf x0, rvgf y0){
-        //printf("begin : (%.2f,%.2f).\n", x0, y0);
         m_last_move = make_R2(x0, y0);
     };
     inline void do_end_open_contour(rvgf x0, rvgf y0){
-        //printf("end open : (%.2f,%.2f).\n", x0, y0);
         this->do_linear_segment(x0, y0, m_last_move[0], m_last_move[1]);
     };
     inline void do_end_closed_contour(rvgf x0, rvgf y0){
-        //printf("end closed : (%.2f,%.2f).\n", x0, y0);
+        (void) x0;
+        (void) y0;
     };
     std::vector<path_segment*>& get() {
         return m_path;
