@@ -6,8 +6,6 @@ program='process.lua'
 lua='luapp5.3'
 heavy=("blue_butterfly"
        "anatomical_heart"
-       "page_1"
-       "page_2"
        "paris-30k"
        "blender_freestyle"
        "bunny_dense_flat"

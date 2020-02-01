@@ -87,9 +87,14 @@ public:
     }
     virtual double in_t(const int i, const double t) const = 0;
     virtual void print() const = 0;
+    inline virtual bool implicit_hit(const double x, const double y) const {
+        (void) x;
+        (void) y;
+        return false;
+    }
     inline bool intersect(const double x, const double y) const {
         if(!m_bbox.hit_right(x, y)){
-            if(m_bbox.hit_left(x, y)){
+            if(m_bbox.hit_left(x, y) || (implicit_hit(x, y) && m_bbox.hit_inside(x, y))){
                 return true;
             }
             else if(m_bbox.hit_inside(x, y)){
@@ -131,16 +136,23 @@ bouding_box::bouding_box(std::vector<path_segment*> &path) {
 }
 
 class linear : public path_segment {
+private:
+    R2 m_d;
 public:
     inline linear(std::vector<R2> &points)
-        : path_segment(points) {
+        : path_segment(points)
+        , m_d(0, 0) {
         assert(points.size() == 2);
+        m_d = points[1] - points[0];
     } 
     inline void print() const {
         printf("\tlin: (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1]);
     }
     inline double in_t(const int i, const double t) const {
         return (1-t)*m_points[0][i] + t*m_points[1][i];
+    }
+    inline bool implicit_hit(const double x, const double y) const {
+        return (m_d[1]*((x - m_points[0][0])*m_d[1] - (y - m_points[0][1])*m_d[0]) <= 0);
     }
 };
 
