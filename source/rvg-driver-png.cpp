@@ -11,12 +11,15 @@
 #include "rvg-image.h"
 #include "rvg-shape.h"
 #include "rvg-paint.h"
+#include "rvg-color-ramp.h"
+#include "rvg-spread.h"
 #include "rvg-rgba.h"
-#include "rvg-winding-rule.h"
-#include "rvg-xform-affinity.h"
+#include "rvg-xform.h"
 
+#include "rvg-winding-rule.h"
 #include "rvg-i-input-path.h"
 #include "rvg-i-monotonic-parameters.h"
+
 #include "rvg-input-path-f-xform.h"
 #include "rvg-input-path-f-monotonize.h"
 #include "rvg-input-path-f-close-contours.h"
@@ -59,10 +62,6 @@ public:
     inline bool hit_inside(const double x, const double y) const {
         return y >= m_p0.get_y() && y < m_p1.get_y() && x >= m_p0.get_x() && x < m_p1.get_x();
     }
-};
-
-class gradient {
-    
 };
 
 class path_segment {
@@ -112,7 +111,7 @@ public:
                     else if(bisection_point[1] < y){
                         t += (double)m_dir*step;
                     }
-                } while(step > 0.0001);
+                } while(step > 0.000001);
                 return (x - bisection_point[0] < EPS);
             }
         }
@@ -210,12 +209,12 @@ private:
     std::vector<path_segment*> m_path;
     bouding_box m_bbox;
     e_winding_rule m_wrule;
-    RGBA8 m_color;
+    paint m_paint;
 public:
     inline scene_object(std::vector<path_segment*> &path, const e_winding_rule &wrule, const paint &paint) 
         : m_bbox(path)
         , m_wrule(wrule)
-        , m_color(paint.get_solid_color()) {
+        , m_paint(paint) {
         m_path = path;
     };
     inline ~scene_object() {
@@ -244,8 +243,76 @@ public:
         }
         return false;
     }
-    inline RGBA8 get_color() const {
-        return m_color;
+    inline RGBA8 get_color(const double x, const double y) const {
+        RGBA8 color = make_rgba8(0, 0, 0, 0);
+        if(m_paint.is_solid_color()){
+            return m_paint.get_solid_color();
+        }
+        else if(m_paint.is_linear_gradient()){
+            linear_gradient_data grad = m_paint.get_linear_gradient_data();
+            R2 p1(grad.get_x1(), grad.get_y1());
+            R2 p2(grad.get_x2(), grad.get_y2());
+            RP2 proj_p = m_paint.get_xf().inverse().apply(make_RP2(x, y));
+            R2 p(proj_p[0]/proj_p[2], proj_p[1]/proj_p[2]);
+            double l_p = dot((p-p1), (p2-p1))/dot((p2-p1), (p2-p1));
+            color_ramp ramp = grad.get_color_ramp();
+            if(l_p > 1 || l_p < 0)
+                switch(ramp.get_spread()){
+                    case e_spread::clamp:
+                        l_p = std::max(0.0, std::min(1.0, l_p));
+                        break;
+                    case e_spread::wrap:
+                        l_p = l_p - std::floor(l_p);
+                        break;
+                    case e_spread::mirror:
+                        l_p = l_p - std::floor(l_p);
+                        if((int)l_p%2 == 0){
+                            l_p = 1 - l_p;
+                        }
+                        break;
+                    case e_spread::transparent:
+                        return make_rgba8(0, 0, 0, 0);
+                }
+            std::vector<color_stop> stops = ramp.get_color_stops();
+            assert(stops.size() > 0);
+            if(l_p <= stops[0].get_offset()){
+                color = stops[0].get_color();
+                return make_rgba8(
+                    color[0],
+                    color[1],
+                    color[2],
+                    color[3]*m_paint.get_opacity()
+                );
+            }
+            else if(l_p >= stops[stops.size()-1].get_offset()){
+                color = stops[stops.size()-1].get_color();
+                return make_rgba8(
+                    color[0],
+                    color[1],
+                    color[2],
+                    color[3]*m_paint.get_opacity()
+                );
+            }
+            else{
+                assert(stops.size() > 1);
+                for(int i = 0, j = 1; j < stops.size(); i++, j++){
+                    if(stops[j].get_offset() >= l_p){
+                        double amp = stops[j].get_offset() - stops[i].get_offset();
+                        l_p -= stops[i].get_offset();
+                        l_p /= amp;
+                        RGBA8 c1 = stops[i].get_color();
+                        RGBA8 c2 = stops[j].get_color();
+                        return make_rgba8(
+                            c1[0]*(1-l_p) + c2[0]*l_p,
+                            c1[1]*(1-l_p) + c2[1]*l_p,
+                            c1[2]*(1-l_p) + c2[2]*l_p,
+                           (c1[3]*(1-l_p) + c2[3]*l_p)*m_paint.get_opacity() 
+                        );
+                    }
+                }
+            }
+        }
+        return color;
     }
     inline void print() const {
         printf("obj:\n");
@@ -345,10 +412,13 @@ private:
         xform post;
         monotonic_builder path_builder;
         path_data::const_ptr path_data = s.as_path_data_ptr(post);
+        const xform s_xf = post*top_xf()*s.get_xf();
+        p.transformed(top_xf());
         path_data->iterate(make_input_path_f_close_contours(
-                           make_input_path_f_xform(post*top_xf()*s.get_xf(),
+                           make_input_path_f_xform(s_xf,
+                           make_input_path_f_downgrade_degenerate(
                            make_input_path_f_monotonize(
-                           make_input_path_f_downgrade_degenerate(path_builder)))));
+                           path_builder)))));
         acc.add(new scene_object(path_builder.get(), wr, p));
     }
     inline void do_begin_transform(uint16_t depth, const xform &xf){
@@ -389,19 +459,14 @@ const accelerated accelerate(const scene &c, const window &w,
 }
 
 RGBA8 sample(const accelerated& a, float x, float y){
-    RGBA8 s_color = make_rgba8(255, 255, 255, 255);
-    for (auto obj : a.objects){
+    RGBA8 c = make_rgba8(0, 0, 0, 0);
+    for(auto obj_it = a.objects.rbegin(); obj_it != a.objects.rend(); ++obj_it) {
+        auto obj = (*obj_it);
         if(obj->hit(x, y)){
-            RGBA8 color = obj->get_color(); 
-            s_color = make_rgba8 (
-                (int)color[0] + (1.0-(int)color[3]/255.0)*(int)s_color[0],
-                (int)color[1] + (1.0-(int)color[3]/255.0)*(int)s_color[1],
-                (int)color[2] + (1.0-(int)color[3]/255.0)*(int)s_color[2],
-                (int)color[3] + (1.0-(int)color[3]/255.0)*(int)s_color[3]
-            );
+            c = over(pre_multiply(c), pre_multiply(obj->get_color(x, y)));
         }
     }
-    return s_color;
+    return over(c, make_rgba8(255, 255, 255, 255));
 }
 
 void render(accelerated &a, const window &w, const viewport &v,
