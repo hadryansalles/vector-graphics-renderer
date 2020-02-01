@@ -20,6 +20,7 @@
 #include "rvg-input-path-f-xform.h"
 #include "rvg-input-path-f-monotonize.h"
 #include "rvg-input-path-f-close-contours.h"
+#include "rvg-input-path-f-downgrade-degenerate.h"
 
 #include "rvg-i-scene-data.h"
 
@@ -33,9 +34,6 @@ namespace rvg {
     namespace driver {
         namespace png {
 
-bool almost_zero(const double& x) {
-    return (std::abs(x) < EPS);
-}
 
 class path_segment;
 
@@ -61,6 +59,10 @@ public:
     inline bool hit_inside(const double x, const double y) const {
         return y >= m_p0.get_y() && y < m_p1.get_y() && x >= m_p0.get_x() && x < m_p1.get_x();
     }
+};
+
+class gradient {
+    
 };
 
 class path_segment {
@@ -294,32 +296,16 @@ public:
     };
     inline void do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1,rvgf x2, rvgf y2){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
-        if(!are_collinear(points)){
-            m_path.push_back(new quadratic(points));
-        }
-        else{
-            do_linear_segment(points[0][0], points[0][1], points[2][0], points[2][1]);
-        }
+        m_path.push_back(new quadratic(points));
     }
     inline void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
-        if(are_collinear(points) && w1 == 1){
-            do_linear_segment(points[0][0], points[0][1], points[2][0], points[2][1]);
-        }
-        else{
-            std::vector<R2> den{make_R2(1, 1), make_R2(w1, w1), make_R2(1, 1)};
-            m_path.push_back(new rational(points, den));    
-        }
-
+        std::vector<R2> den{make_R2(1, 1), make_R2(w1, w1), make_R2(1, 1)};
+        m_path.push_back(new rational(points, den));    
     };
     inline void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3)};
-        if(!are_collinear(points)){
-            m_path.push_back(new cubic(points));
-        }
-        else{
-            do_linear_segment(points[0][0], points[0][1], points[3][0], points[3][1]);
-        }
+        m_path.push_back(new cubic(points));
     };
     inline void do_begin_contour(rvgf x0, rvgf y0){
         m_last_move = make_R2(x0, y0);
@@ -333,24 +319,6 @@ public:
     };
     std::vector<path_segment*>& get() {
         return m_path;
-    } 
-    inline static bool are_collinear(std::vector<R2> &points) {
-        int size = points.size();
-        for(int i = 0; i < size; i++) {
-            R2 p1 = points[i];
-            for(int j = i+1; j < size; j++) {
-                R2 p2 = points[j];
-                for(int k = j+1; k < size; k++) { 
-                    R2 p3 = points[k];
-                    double r1 = (p2[0] - p1[0])*(p3[1] - p1[1]);
-                    double r2 = (p3[0] - p1[0])*(p2[1] - p1[1]);
-                    if(!almost_zero(r1-r2)){
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
     }
 };
 
@@ -362,38 +330,36 @@ private:
     
     inline void push_xf(const xform &xf){
         m_xf_stack.push_back(top_xf() * xf);
-    };
+    }
     inline void pop_xf(){
         if (m_xf_stack.size() > 0) {
             m_xf_stack.pop_back();
         }
-    };
+    }
     inline const xform &top_xf() const{
         static xform id;
         if (m_xf_stack.empty()) return id;
         else return m_xf_stack.back();
-    };
+    }
     inline void do_painted_shape(e_winding_rule wr, const shape &s, const paint &p){
         xform post;
         monotonic_builder path_builder;
         path_data::const_ptr path_data = s.as_path_data_ptr(post);
         path_data->iterate(make_input_path_f_close_contours(
                            make_input_path_f_xform(post*top_xf()*s.get_xf(),
-                           make_input_path_f_monotonize(path_builder))));
+                           make_input_path_f_monotonize(
+                           make_input_path_f_downgrade_degenerate(path_builder)))));
         acc.add(new scene_object(path_builder.get(), wr, p));
-    };
-
+    }
     inline void do_begin_transform(uint16_t depth, const xform &xf){
         (void) depth;
         push_xf(xf);
-    };
-
+    }
     inline void do_end_transform(uint16_t depth, const xform &xf){
         (void) depth;
         (void) xf;
         pop_xf(); 
-    };
-
+    }
     inline void do_tensor_product_patch(const patch<16,4> &tpp){(void) tpp;};
     inline void do_coons_patch(const patch<12,4> &cp){(void) cp;};
     inline void do_gouraud_triangle(const patch<3,3> &gt){(void) gt;};
