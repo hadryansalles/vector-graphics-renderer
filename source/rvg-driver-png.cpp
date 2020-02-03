@@ -204,19 +204,173 @@ public:
     }
 };
 
+class color_solver {
+protected:
+    paint m_paint;
+public:
+    color_solver(const paint& pat)
+        : m_paint(pat)
+    {}
+    virtual ~color_solver()
+    {}
+    virtual RGBA8 solve(double x, double y) const {
+        (void) x, y;
+        RGBA8 color = m_paint.get_solid_color();
+        return make_rgba8(
+            color[0], color[1], color[2], color[3]*m_paint.get_opacity()
+        );
+    }
+};
+
+class color_gradient_solver : public color_solver {
+protected:
+    color_ramp m_ramp;
+    const xform m_inv_xf;
+    double spread(double t) const {
+        double rt = t;
+        if(t < 0 && t > 1) {
+            switch(m_ramp.get_spread()){
+                case e_spread::clamp:
+                    rt = std::max(0.0, std::min(1.0, t));
+                    break;
+                case e_spread::wrap:
+                    rt = t - std::floor(t);
+                    break;
+                case e_spread::mirror:
+                    rt =  t - std::floor(t);
+                    if((int)rt%2 == 0){
+                        rt = 1 - rt;
+                    }
+                    break;
+                case e_spread::transparent:
+                    rt = -1;
+                    break;
+                default:
+                    rt = -1;
+                    break;
+            }
+        }
+        return rt;
+    }
+    virtual RGBA8 wrap(double t) const {
+        RGBA8 color(0, 0, 0, 0);
+        std::vector<color_stop> stops = m_ramp.get_color_stops();
+        assert(stops.size() > 0);
+        if(t <= stops[0].get_offset()){
+            color = stops[0].get_color();
+        }
+        else if(t >= stops[stops.size()-1].get_offset()){
+            color = stops[stops.size()-1].get_color();
+        }
+        else{
+            assert(stops.size() > 1);
+            for(int i = 0, j = 1; j < stops.size(); i++, j++){
+                if(stops[j].get_offset() >= t){
+                    double amp = stops[j].get_offset() - stops[i].get_offset();
+                    t -= stops[i].get_offset();
+                    t /= amp;
+                    RGBA8 c1 = stops[i].get_color();
+                    RGBA8 c2 = stops[j].get_color();
+                    return make_rgba8(
+                        c1[0]*(1-t) + c2[0]*t,
+                        c1[1]*(1-t) + c2[1]*t,
+                        c1[2]*(1-t) + c2[2]*t,
+                        c1[3]*(1-t) + c2[3]*t 
+                    );
+                    break;
+                }
+            }
+        }
+        return color;
+    }
+    virtual double convert(R2 p) const = 0;
+public:
+    color_gradient_solver(const paint &pat, const color_ramp &ramp) 
+        : color_solver(pat)
+        , m_ramp(ramp)
+        , m_inv_xf(m_paint.get_xf().inverse()) {
+    }
+    virtual ~color_gradient_solver()
+    {}
+    virtual RGBA8 solve(double x, double y) const {
+        RGBA8 color(0, 0, 0, 0);
+        RP2 pp(m_inv_xf.apply(make_RP2(x, y)));
+        R2 p(pp[0]/pp[2], pp[1]/pp[2]);
+        double t = spread(convert(p));
+        if(t != -1) {
+            color = wrap(t);
+        }
+        return make_rgba8(color[0], color[1], color[2], color[3]*m_paint.get_opacity());
+    }
+};
+
+class linear_gradient_solver : public color_gradient_solver {
+private:
+    const linear_gradient_data m_data;
+    const R2 m_p1;
+    const R2 m_p2_p1;
+    double convert(R2 p) const {
+        return dot((p-m_p1), (m_p2_p1))/dot((m_p2_p1), (m_p2_p1));
+    }
+public:
+    linear_gradient_solver(const paint& pat)
+        : color_gradient_solver(pat, pat.get_linear_gradient_data().get_color_ramp())
+        , m_data(m_paint.get_linear_gradient_data())
+        , m_p1(m_data.get_x1(), m_data.get_y1())
+        , m_p2_p1(m_data.get_x2()-m_data.get_x1(), m_data.get_y2()-m_data.get_y1()) 
+    {}
+};
+
+class radial_gradient_solver : public color_gradient_solver {
+private:
+    const radial_gradient_data m_data;
+    xform m_r_xf;
+    R2 m_xf_c;
+    double m_dot_c;
+    double convert(R2 p) const {
+        RP2 pp = m_r_xf.apply(p);
+        p = make_R2(pp[0]/pp[2], pp[1]/pp[2]);
+        // x*(p[1]/p[0]) + y = 0
+        // (x-m_xf_c[0])² + (y-m_xf_c[1])² - 1 = 0
+        // y = x*p[1]/p[0]
+        // x**2*(1 + (p[1]/p[0])**2) - 2*x*(m_xf_c[0] + (p[1]/p[0])*m_xf_c[1]) + m_dot_c - 1;
+    }
+public:
+    radial_gradient_solver(const paint& pat)
+        : color_gradient_solver(pat, pat.get_radial_gradient_data().get_color_ramp())
+        , m_data(pat.get_radial_gradient_data()) 
+        , m_xf_c(m_data.get_cx(), m_data.get_cy()) {
+        double mod_f = std::sqrt(m_data.get_fx()*m_data.get_fx() + m_data.get_fy()*m_data.get_fy());
+        m_r_xf = m_r_xf.translated(-m_data.get_cx(), -m_data.get_cy())
+                         .scaled(1.0/m_data.get_r())
+                         .rotated(-m_data.get_fx()/mod_f, m_data.get_fy()/mod_f);
+        RP2 f_xformed = m_r_xf.apply(make_R2(m_data.get_fx(), m_data.get_fy()));
+        m_r_xf = m_r_xf.translated(-f_xformed[0]/f_xformed[2], -f_xformed[1]/f_xformed[2]);
+        RP2 c_proj = m_r_xf.apply(m_xf_c);
+        m_xf_c = make_R2(c_proj[0]/c_proj[2], c_proj[1]/c_proj[2]);
+        m_dot_c = dot(m_xf_c, m_xf_c);
+    }   
+};
+
 class scene_object {
 private:
     std::vector<path_segment*> m_path;
     bouding_box m_bbox;
     e_winding_rule m_wrule;
-    paint m_paint;
+    color_solver* color;
 public:
     inline scene_object(std::vector<path_segment*> &path, const e_winding_rule &wrule, const paint &paint) 
         : m_bbox(path)
-        , m_wrule(wrule)
-        , m_paint(paint) {
+        , m_wrule(wrule) {
         m_path = path;
-    };
+        if(paint.is_solid_color()) {
+            color = new color_solver(paint);
+        } else if(paint.is_linear_gradient()) {
+            color = new linear_gradient_solver(paint);
+        } else {
+            color = new color_solver(paint);
+        }
+    }
     inline ~scene_object() {
         m_path.clear();
     }
@@ -225,6 +379,7 @@ public:
             delete seg;
             seg = NULL;
         }
+        delete color;
     }
     inline bool hit(const double x, const double y) const {
         if(m_bbox.hit_inside(x, y)) { 
@@ -244,75 +399,83 @@ public:
         return false;
     }
     inline RGBA8 get_color(const double x, const double y) const {
-        RGBA8 color = make_rgba8(0, 0, 0, 0);
-        if(m_paint.is_solid_color()){
-            return m_paint.get_solid_color();
-        }
-        else if(m_paint.is_linear_gradient()){
-            linear_gradient_data grad = m_paint.get_linear_gradient_data();
-            R2 p1(grad.get_x1(), grad.get_y1());
-            R2 p2(grad.get_x2(), grad.get_y2());
-            RP2 proj_p = m_paint.get_xf().inverse().apply(make_RP2(x, y));
-            R2 p(proj_p[0]/proj_p[2], proj_p[1]/proj_p[2]);
-            double l_p = dot((p-p1), (p2-p1))/dot((p2-p1), (p2-p1));
-            color_ramp ramp = grad.get_color_ramp();
-            if(l_p > 1 || l_p < 0)
-                switch(ramp.get_spread()){
-                    case e_spread::clamp:
-                        l_p = std::max(0.0, std::min(1.0, l_p));
-                        break;
-                    case e_spread::wrap:
-                        l_p = l_p - std::floor(l_p);
-                        break;
-                    case e_spread::mirror:
-                        l_p = l_p - std::floor(l_p);
-                        if((int)l_p%2 == 0){
-                            l_p = 1 - l_p;
-                        }
-                        break;
-                    case e_spread::transparent:
-                        return make_rgba8(0, 0, 0, 0);
-                }
-            std::vector<color_stop> stops = ramp.get_color_stops();
-            assert(stops.size() > 0);
-            if(l_p <= stops[0].get_offset()){
-                color = stops[0].get_color();
-                return make_rgba8(
-                    color[0],
-                    color[1],
-                    color[2],
-                    color[3]*m_paint.get_opacity()
-                );
-            }
-            else if(l_p >= stops[stops.size()-1].get_offset()){
-                color = stops[stops.size()-1].get_color();
-                return make_rgba8(
-                    color[0],
-                    color[1],
-                    color[2],
-                    color[3]*m_paint.get_opacity()
-                );
-            }
-            else{
-                assert(stops.size() > 1);
-                for(int i = 0, j = 1; j < stops.size(); i++, j++){
-                    if(stops[j].get_offset() >= l_p){
-                        double amp = stops[j].get_offset() - stops[i].get_offset();
-                        l_p -= stops[i].get_offset();
-                        l_p /= amp;
-                        RGBA8 c1 = stops[i].get_color();
-                        RGBA8 c2 = stops[j].get_color();
-                        return make_rgba8(
-                            c1[0]*(1-l_p) + c2[0]*l_p,
-                            c1[1]*(1-l_p) + c2[1]*l_p,
-                            c1[2]*(1-l_p) + c2[2]*l_p,
-                           (c1[3]*(1-l_p) + c2[3]*l_p)*m_paint.get_opacity() 
-                        );
-                    }
-                }
-            }
-        }
-        return color;
+        return color->solve(x, y);
+        // RGBA8 color = make_rgba8(0, 0, 0, 0);
+        // switch(m_paint.get_type()) {
+        //     case e_type::solid_color
+        //         color = m_paint.get_solid_color();
+        //         break;
+        //     case e_type::linear_gradient_solver
+
+        //         break;
+        //     default:
+        //         break;
+        // }
+
+        // RP2 proj_p = m_paint_xf.apply(make_RP2(x, y));
+        // R2 p(proj_p[0]/proj_p[2], proj_p[1]/proj_p[2]);
+        // double t = lin_r2_to_r(p);
+        // ramp = grad.
+        // t = spread(t, ramp.get_spread());
+
+
+        // return make_rgba8(color[0], color[1], color[2], color[3]*m_paint.get_opacity());
+
+        // if(m_paint.is_solid_color()){
+        //     return m_paint.get_solid_color();
+        // }
+        // else if(m_paint.is_linear_gradient()){
+        //     linear_gradient_data grad = m_paint.get_linear_gradient_data();
+        //     R2 p1(grad.get_x1(), grad.get_y1());
+        //     R2 p2(grad.get_x2(), grad.get_y2());
+        //     RP2 proj_p = m_paint.get_xf().inverse().apply(make_RP2(x, y));
+        //     R2 p(proj_p[0]/proj_p[2], proj_p[1]/proj_p[2]);
+        //     double l_p = dot((p-p1), (p2-p1))/dot((p2-p1), (p2-p1));
+        //     color_ramp ramp = grad.get_color_ramp();
+        //     if(l_p > 1 || l_p < 0){
+        //         l_p = spread(l_p, ramp.get_spread());
+        //     }
+                
+        //     std::vector<color_stop> stops = ramp.get_color_stops();
+        //     assert(stops.size() > 0);
+        //     if(l_p <= stops[0].get_offset()){
+        //         color = stops[0].get_color();
+        //         return make_rgba8(
+        //             color[0],
+        //             color[1],
+        //             color[2],
+        //             color[3]*m_paint.get_opacity()
+        //         );
+        //     }
+        //     else if(l_p >= stops[stops.size()-1].get_offset()){
+        //         color = stops[stops.size()-1].get_color();
+        //         return make_rgba8(
+        //             color[0],
+        //             color[1],
+        //             color[2],
+        //             color[3]*m_paint.get_opacity()
+        //         );
+        //     }
+        //     else{
+        //         assert(stops.size() > 1);
+        //         for(int i = 0, j = 1; j < stops.size(); i++, j++){
+        //             if(stops[j].get_offset() >= l_p){
+        //                 double amp = stops[j].get_offset() - stops[i].get_offset();
+        //                 l_p -= stops[i].get_offset();
+        //                 l_p /= amp;
+        //                 RGBA8 c1 = stops[i].get_color();
+        //                 RGBA8 c2 = stops[j].get_color();
+        //                 return make_rgba8(
+        //                     c1[0]*(1-l_p) + c2[0]*l_p,
+        //                     c1[1]*(1-l_p) + c2[1]*l_p,
+        //                     c1[2]*(1-l_p) + c2[2]*l_p,
+        //                    (c1[3]*(1-l_p) + c2[3]*l_p)*m_paint.get_opacity() 
+        //                 );
+        //             }
+        //         }
+        //     }
+        // }
+        // return color;
     }
     inline void print() const {
         printf("obj:\n");
