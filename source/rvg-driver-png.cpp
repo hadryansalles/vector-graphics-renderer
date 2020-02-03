@@ -123,16 +123,17 @@ public:
 };
 
 bouding_box::bouding_box(std::vector<path_segment*> &path) {
-    assert(path.size() > 0);
-    m_p0 = path[0]->bezier(0);
-    m_p1 = path[0]->bezier(1);
-    for(auto seg : path){
-        R2 first = seg->bezier(0);
-        R2 last =  seg->bezier(1);
-        m_p0 = make_R2(std::min(m_p0[0], first[0]), std::min(m_p0[1], first[1]));
-        m_p0 = make_R2(std::min(m_p0[0],  last[0]), std::min(m_p0[1],  last[1]));
-        m_p1 = make_R2(std::max(m_p1[0], first[0]), std::max(m_p1[1], first[1]));
-        m_p1 = make_R2(std::max(m_p1[0],  last[0]), std::max(m_p1[1],  last[1]));
+    if(path.size() > 0) {
+        m_p0 = path[0]->bezier(0);
+        m_p1 = path[0]->bezier(1);
+        for(auto seg : path){
+            R2 first = seg->bezier(0);
+            R2 last =  seg->bezier(1);
+            m_p0 = make_R2(std::min(m_p0[0], first[0]), std::min(m_p0[1], first[1]));
+            m_p0 = make_R2(std::min(m_p0[0],  last[0]), std::min(m_p0[1],  last[1]));
+            m_p1 = make_R2(std::max(m_p1[0], first[0]), std::max(m_p1[1], first[1]));
+            m_p1 = make_R2(std::max(m_p1[0],  last[0]), std::max(m_p1[1],  last[1]));
+        }
     }
 }
 
@@ -214,7 +215,8 @@ public:
     virtual ~color_solver()
     {}
     virtual RGBA8 solve(double x, double y) const {
-        (void) x, y;
+        (void) x;
+        (void) y;
         RGBA8 color = m_paint.get_solid_color();
         return make_rgba8(
             color[0], color[1], color[2], color[3]*m_paint.get_opacity()
@@ -321,36 +323,115 @@ public:
     {}
 };
 
+
 class radial_gradient_solver : public color_gradient_solver {
 private:
     const radial_gradient_data m_data;
-    xform m_r_xf;
-    R2 m_xf_c;
-    double m_dot_c;
-    double convert(R2 p) const {
-        RP2 pp = m_r_xf.apply(p);
-        p = make_R2(pp[0]/pp[2], pp[1]/pp[2]);
-        // x*(p[1]/p[0]) + y = 0
-        // (x-m_xf_c[0])² + (y-m_xf_c[1])² - 1 = 0
-        // y = x*p[1]/p[0]
-        // x**2*(1 + (p[1]/p[0])**2) - 2*x*(m_xf_c[0] + (p[1]/p[0])*m_xf_c[1]) + m_dot_c - 1;
+    xform  m_xf;
+    R2     m_c;
+    R2     m_f;
+    double m_r;
+    double m_mod_f;
+    double m_a;
+    double m_b;
+    double convert(R2 p_in) const {
+        R2 p(m_xf.apply(p_in));
+        double A = p[0]*p[0] + p[1]*p[1];
+        double B = p[0]*m_a;
+        double C = m_b;
+        double det = B*B - A*C;
+        assert(det >= 0);
+        det = std::sqrt(det);
+        assert(std::abs(-B + det) > EPS);
+        return A/(-B + det);
     }
+    //     local b, c =  x*acpaint.b, acpaint.c
+        //     local a = x*x + y*y
+        //     -- resolverá t^2*(a/2) + t*b + (c/2) = 0 e retorna 1/t
+        //     local d = b*b - a*c
+        //     assert(d >= 0)
+        //     d = math.sqrt(d)
+        //     assert(math.abs(-b + d) > eps)
+        //     local t = wrapping[ramp:get_spread()](a / (-b + d))
+        
 public:
     radial_gradient_solver(const paint& pat)
         : color_gradient_solver(pat, pat.get_radial_gradient_data().get_color_ramp())
         , m_data(pat.get_radial_gradient_data()) 
-        , m_xf_c(m_data.get_cx(), m_data.get_cy()) {
-        double mod_f = std::sqrt(m_data.get_fx()*m_data.get_fx() + m_data.get_fy()*m_data.get_fy());
-        m_r_xf = m_r_xf.translated(-m_data.get_cx(), -m_data.get_cy())
-                         .scaled(1.0/m_data.get_r())
-                         .rotated(-m_data.get_fx()/mod_f, m_data.get_fy()/mod_f);
-        RP2 f_xformed = m_r_xf.apply(make_R2(m_data.get_fx(), m_data.get_fy()));
-        m_r_xf = m_r_xf.translated(-f_xformed[0]/f_xformed[2], -f_xformed[1]/f_xformed[2]);
-        RP2 c_proj = m_r_xf.apply(m_xf_c);
-        m_xf_c = make_R2(c_proj[0]/c_proj[2], c_proj[1]/c_proj[2]);
-        m_dot_c = dot(m_xf_c, m_xf_c);
+        , m_c(m_data.get_cx(), m_data.get_cy()) 
+        , m_f(m_data.get_fx(), m_data.get_fy())
+        , m_r(m_data.get_r()) {
+        m_xf = identity().translated(-m_c[0], -m_c[1]).scaled(1/m_r);
+        m_f = R2(m_xf.apply(m_f));
+        m_mod_f = std::sqrt(m_f[0]*m_f[0] + m_f[1]*m_f[1]);
+        // m_mod_f = std::min(std::sqrt(m_f[0]*m_f[0] + m_f[1]*m_f[1]), 1.f-EPS);
+        if(m_mod_f > 1.0f - EPS){
+            m_mod_f = 1.0f - EPS;
+        }
+        if(m_mod_f > EPS){
+            m_xf = m_xf.transformed(make_affinity(-m_f[0]/m_mod_f, -m_f[1]/m_mod_f, m_mod_f,  -m_f[1]/m_mod_f, m_f[0]/m_mod_f, 0));   
+        }
+        // T = multiply({-fx/nf, -fy/nf, nf,  -fy/nf, fx/nf, 0}, T) --rotaciona até deixar f ao eixo x e dps translada para a origem
+
+        m_a = -m_mod_f;
+        m_b = m_mod_f*m_mod_f - 1;
     }   
-};
+};  
+
+//  double mod_f = std::sqrt()
+//         double mod_f = std::sqrt(m_data.get_fx()*m_data.get_fx() + m_data.get_fy()*m_data.get_fy());
+//         m_xf = affinity().translated(-m_data.get_cx(), -m_data.get_cy())
+//                          .scaled(1.0/m_data.get_r());
+        
+//                          .rotated(-m_data.get_fx()/mod_f, m_data.get_fy()/mod_f);
+        
+//         RP2 f_xformed = m_xf.apply(make_R2(m_data.get_fx(), m_data.get_fy()));
+//         assert(f_xformed[2] == 1.0f);
+//         m_xf = m_xf.translated(-f_xformed[0], -f_xformed[1]);
+//         assert(m_xf.apply(make_R2(m_data.get_fx(), m_data.get_fy())) == make_RP2(0, 0, 1));
+//         auto c_proj = m_xf.apply(m_c);
+//         assert(c_proj[2] == 1.0f);
+//         m_c = make_R2(c_proj[0], c_proj[1]);
+//         m_C_coeff = m_c[0]*m_c[0] + m_c[1]*m_c[1] - 1;
+ // R2 p(m_xf.apply(p_in));
+
+        // local radial_gradient = paint:get_radial_gradient_data()
+        //     local cx = radial_gradient:get_cx()
+        //     local cy = radial_gradient:get_cy()
+        //     local fx = radial_gradient:get_fx()
+        //     local fy = radial_gradient:get_fy()
+        //     local r = radial_gradient:get_r()
+        //     local T = {1/r, 0, -cx/r, 0, 1/r, -cy/r} --leva o círculo ao círculo padrão
+        //     fx, fy = transform(T, fx, fy)
+        //     local nf = math.min(math.sqrt(fx*fx + fy*fy), 1 - 1.0e-2) -- caso o ponto f esteja fora da circunferência, ele é projetado para o interio dela.
+        //     if nf > eps then
+        //         T = multiply({-fx/nf, -fy/nf, nf,  -fy/nf, fx/nf, 0}, T) --rotaciona até deixar f ao eixo x e dps translada para a origem
+        //     end
+        //     T = multiply(T, inverse(paint:get_xf()))
+        //     // return {ramp = radial_gradient:get_color_ramp(), b = -nf, c = (nf*nf - 1), T = T,
+        //     //         opacity = paint:get_opacity(), get_type = paint:get_type()}
+
+            
+        // R2 orig = p;
+        // RP2 pp = m_xf.apply(p);
+        // assert(pp[2] == 1.0f);
+        // p = make_R2(pp[0], pp[1]);
+        // double A = (p[0]*p[0] + p[1]*p[1])/(p[0]*p[0]);
+        // //double B = -2*p[0]*std::sqrt(m_c[0]*m_c[0] + m_c[1]*m_c[1]);
+        // double B = (-2*m_c[0]*p[0] -2*m_c[1]*p[1])/p[0];
+        // double C = m_c[0]*m_c[0] + m_c[1]*m_c[1] - 1;
+        // double det = std::pow(B, 2) - 4*A*C;
+        // assert(det >= 0); 
+        // double root = (-B - sqrt(det))/(2*A);
+        // R2 p_i(root, p[1]/p[0]*root);
+        // double dist_i_p_p = (p_i[1]-p[1])*(p_i[1]-p[1]) + (p_i[1]-p[1])*(p_i[1]-p[1]);
+        // double dist_f_p = p[0]*p[0] + p[1]*p[1];
+        // double ret_v =  std::sqrt(dist_i_p_p/dist_f_p);
+        // if(ret_v < 1) {
+        //     printf("convert (%.2f, %.2f) into %.2f\n", orig[0], orig[1], ret_v);
+        // }
+        // return ret_v;
+       
 
 class scene_object {
 private:
@@ -359,16 +440,21 @@ private:
     e_winding_rule m_wrule;
     color_solver* color;
 public:
-    inline scene_object(std::vector<path_segment*> &path, const e_winding_rule &wrule, const paint &paint) 
+    inline scene_object(std::vector<path_segment*> &path, const e_winding_rule &wrule, const paint &paint_in) 
         : m_bbox(path)
         , m_wrule(wrule) {
         m_path = path;
-        if(paint.is_solid_color()) {
-            color = new color_solver(paint);
-        } else if(paint.is_linear_gradient()) {
-            color = new linear_gradient_solver(paint);
+        if(paint_in.is_solid_color()) {
+            color = new color_solver(paint_in);
+        } else if(paint_in.is_linear_gradient()) {
+            color = new linear_gradient_solver(paint_in);
+        } else if(paint_in.is_radial_gradient()) {
+            color = new radial_gradient_solver(paint_in);
         } else {
-            color = new color_solver(paint);
+            RGBA8 s_transparent(0, 0, 0, 0);
+            unorm8 s_opacity(0);
+            paint s_paint(s_transparent, s_opacity);
+            color = new color_solver(s_paint);
         }
     }
     inline ~scene_object() {
@@ -400,82 +486,6 @@ public:
     }
     inline RGBA8 get_color(const double x, const double y) const {
         return color->solve(x, y);
-        // RGBA8 color = make_rgba8(0, 0, 0, 0);
-        // switch(m_paint.get_type()) {
-        //     case e_type::solid_color
-        //         color = m_paint.get_solid_color();
-        //         break;
-        //     case e_type::linear_gradient_solver
-
-        //         break;
-        //     default:
-        //         break;
-        // }
-
-        // RP2 proj_p = m_paint_xf.apply(make_RP2(x, y));
-        // R2 p(proj_p[0]/proj_p[2], proj_p[1]/proj_p[2]);
-        // double t = lin_r2_to_r(p);
-        // ramp = grad.
-        // t = spread(t, ramp.get_spread());
-
-
-        // return make_rgba8(color[0], color[1], color[2], color[3]*m_paint.get_opacity());
-
-        // if(m_paint.is_solid_color()){
-        //     return m_paint.get_solid_color();
-        // }
-        // else if(m_paint.is_linear_gradient()){
-        //     linear_gradient_data grad = m_paint.get_linear_gradient_data();
-        //     R2 p1(grad.get_x1(), grad.get_y1());
-        //     R2 p2(grad.get_x2(), grad.get_y2());
-        //     RP2 proj_p = m_paint.get_xf().inverse().apply(make_RP2(x, y));
-        //     R2 p(proj_p[0]/proj_p[2], proj_p[1]/proj_p[2]);
-        //     double l_p = dot((p-p1), (p2-p1))/dot((p2-p1), (p2-p1));
-        //     color_ramp ramp = grad.get_color_ramp();
-        //     if(l_p > 1 || l_p < 0){
-        //         l_p = spread(l_p, ramp.get_spread());
-        //     }
-                
-        //     std::vector<color_stop> stops = ramp.get_color_stops();
-        //     assert(stops.size() > 0);
-        //     if(l_p <= stops[0].get_offset()){
-        //         color = stops[0].get_color();
-        //         return make_rgba8(
-        //             color[0],
-        //             color[1],
-        //             color[2],
-        //             color[3]*m_paint.get_opacity()
-        //         );
-        //     }
-        //     else if(l_p >= stops[stops.size()-1].get_offset()){
-        //         color = stops[stops.size()-1].get_color();
-        //         return make_rgba8(
-        //             color[0],
-        //             color[1],
-        //             color[2],
-        //             color[3]*m_paint.get_opacity()
-        //         );
-        //     }
-        //     else{
-        //         assert(stops.size() > 1);
-        //         for(int i = 0, j = 1; j < stops.size(); i++, j++){
-        //             if(stops[j].get_offset() >= l_p){
-        //                 double amp = stops[j].get_offset() - stops[i].get_offset();
-        //                 l_p -= stops[i].get_offset();
-        //                 l_p /= amp;
-        //                 RGBA8 c1 = stops[i].get_color();
-        //                 RGBA8 c2 = stops[j].get_color();
-        //                 return make_rgba8(
-        //                     c1[0]*(1-l_p) + c2[0]*l_p,
-        //                     c1[1]*(1-l_p) + c2[1]*l_p,
-        //                     c1[2]*(1-l_p) + c2[2]*l_p,
-        //                    (c1[3]*(1-l_p) + c2[3]*l_p)*m_paint.get_opacity() 
-        //                 );
-        //             }
-        //         }
-        //     }
-        // }
-        // return color;
     }
     inline void print() const {
         printf("obj:\n");
