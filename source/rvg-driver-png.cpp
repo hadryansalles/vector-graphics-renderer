@@ -31,7 +31,7 @@
 
 #include "rvg-driver-png.h"
 
-#define EPS 0.0000000001
+#define EPS 0.0000000000001
 
 namespace rvg {
     namespace driver {
@@ -332,28 +332,20 @@ private:
     R2     m_f;
     double m_r;
     double m_mod_f;
-    double m_a;
-    double m_b;
+    double m_B;
+    double m_C;
     double convert(R2 p_in) const {
         R2 p(m_xf.apply(p_in));
         double A = p[0]*p[0] + p[1]*p[1];
-        double B = p[0]*m_a;
-        double C = m_b;
+        double B = p[0]*m_B;
+        double C = m_C;
         double det = B*B - A*C;
         assert(det >= 0);
         det = std::sqrt(det);
-        assert(std::abs(-B + det) > EPS);
+        //assert(std::abs(-B + det) > EPS);
         return A/(-B + det);
     }
-    //     local b, c =  x*acpaint.b, acpaint.c
-        //     local a = x*x + y*y
-        //     -- resolverá t^2*(a/2) + t*b + (c/2) = 0 e retorna 1/t
-        //     local d = b*b - a*c
-        //     assert(d >= 0)
-        //     d = math.sqrt(d)
-        //     assert(math.abs(-b + d) > eps)
-        //     local t = wrapping[ramp:get_spread()](a / (-b + d))
-        
+       
 public:
     radial_gradient_solver(const paint& pat)
         : color_gradient_solver(pat, pat.get_radial_gradient_data().get_color_ramp())
@@ -364,74 +356,16 @@ public:
         m_xf = identity().translated(-m_c[0], -m_c[1]).scaled(1/m_r);
         m_f = R2(m_xf.apply(m_f));
         m_mod_f = std::sqrt(m_f[0]*m_f[0] + m_f[1]*m_f[1]);
-        // m_mod_f = std::min(std::sqrt(m_f[0]*m_f[0] + m_f[1]*m_f[1]), 1.f-EPS);
         if(m_mod_f > 1.0f - EPS){
             m_mod_f = 1.0f - EPS;
         }
         if(m_mod_f > EPS){
             m_xf = m_xf.transformed(make_affinity(-m_f[0]/m_mod_f, -m_f[1]/m_mod_f, m_mod_f,  -m_f[1]/m_mod_f, m_f[0]/m_mod_f, 0));   
         }
-        // T = multiply({-fx/nf, -fy/nf, nf,  -fy/nf, fx/nf, 0}, T) --rotaciona até deixar f ao eixo x e dps translada para a origem
-
-        m_a = -m_mod_f;
-        m_b = m_mod_f*m_mod_f - 1;
+        m_B = -m_mod_f;
+        m_C = m_mod_f*m_mod_f - 1;
     }   
 };  
-
-//  double mod_f = std::sqrt()
-//         double mod_f = std::sqrt(m_data.get_fx()*m_data.get_fx() + m_data.get_fy()*m_data.get_fy());
-//         m_xf = affinity().translated(-m_data.get_cx(), -m_data.get_cy())
-//                          .scaled(1.0/m_data.get_r());
-        
-//                          .rotated(-m_data.get_fx()/mod_f, m_data.get_fy()/mod_f);
-        
-//         RP2 f_xformed = m_xf.apply(make_R2(m_data.get_fx(), m_data.get_fy()));
-//         assert(f_xformed[2] == 1.0f);
-//         m_xf = m_xf.translated(-f_xformed[0], -f_xformed[1]);
-//         assert(m_xf.apply(make_R2(m_data.get_fx(), m_data.get_fy())) == make_RP2(0, 0, 1));
-//         auto c_proj = m_xf.apply(m_c);
-//         assert(c_proj[2] == 1.0f);
-//         m_c = make_R2(c_proj[0], c_proj[1]);
-//         m_C_coeff = m_c[0]*m_c[0] + m_c[1]*m_c[1] - 1;
- // R2 p(m_xf.apply(p_in));
-
-        // local radial_gradient = paint:get_radial_gradient_data()
-        //     local cx = radial_gradient:get_cx()
-        //     local cy = radial_gradient:get_cy()
-        //     local fx = radial_gradient:get_fx()
-        //     local fy = radial_gradient:get_fy()
-        //     local r = radial_gradient:get_r()
-        //     local T = {1/r, 0, -cx/r, 0, 1/r, -cy/r} --leva o círculo ao círculo padrão
-        //     fx, fy = transform(T, fx, fy)
-        //     local nf = math.min(math.sqrt(fx*fx + fy*fy), 1 - 1.0e-2) -- caso o ponto f esteja fora da circunferência, ele é projetado para o interio dela.
-        //     if nf > eps then
-        //         T = multiply({-fx/nf, -fy/nf, nf,  -fy/nf, fx/nf, 0}, T) --rotaciona até deixar f ao eixo x e dps translada para a origem
-        //     end
-        //     T = multiply(T, inverse(paint:get_xf()))
-        //     // return {ramp = radial_gradient:get_color_ramp(), b = -nf, c = (nf*nf - 1), T = T,
-        //     //         opacity = paint:get_opacity(), get_type = paint:get_type()}
-
-            
-        // R2 orig = p;
-        // RP2 pp = m_xf.apply(p);
-        // assert(pp[2] == 1.0f);
-        // p = make_R2(pp[0], pp[1]);
-        // double A = (p[0]*p[0] + p[1]*p[1])/(p[0]*p[0]);
-        // //double B = -2*p[0]*std::sqrt(m_c[0]*m_c[0] + m_c[1]*m_c[1]);
-        // double B = (-2*m_c[0]*p[0] -2*m_c[1]*p[1])/p[0];
-        // double C = m_c[0]*m_c[0] + m_c[1]*m_c[1] - 1;
-        // double det = std::pow(B, 2) - 4*A*C;
-        // assert(det >= 0); 
-        // double root = (-B - sqrt(det))/(2*A);
-        // R2 p_i(root, p[1]/p[0]*root);
-        // double dist_i_p_p = (p_i[1]-p[1])*(p_i[1]-p[1]) + (p_i[1]-p[1])*(p_i[1]-p[1]);
-        // double dist_f_p = p[0]*p[0] + p[1]*p[1];
-        // double ret_v =  std::sqrt(dist_i_p_p/dist_f_p);
-        // if(ret_v < 1) {
-        //     printf("convert (%.2f, %.2f) into %.2f\n", orig[0], orig[1], ret_v);
-        // }
-        // return ret_v;
-       
 
 class scene_object {
 private:
