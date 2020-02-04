@@ -31,7 +31,7 @@
 
 #include "rvg-driver-png.h"
 
-#define EPS 0.0001
+#define EPS 0.00001
 
 namespace rvg {
     namespace driver {
@@ -327,43 +327,34 @@ class radial_gradient_solver : public color_gradient_solver {
 private:
     const radial_gradient_data m_data;
     xform  m_xf;
-    R2     m_c;
-    R2     m_f;
-    double m_r;
-    double m_mod_f;
     double m_B;
     double m_C;
     double convert(R2 p_in) const {
         R2 p(m_xf.apply(p_in));
         double A = p[0]*p[0] + p[1]*p[1];
         double B = p[0]*m_B;
-        double C = m_C;
-        double det = B*B - A*C;
+        double det = B*B - A*m_C;
         assert(det >= 0);
         det = std::sqrt(det);
         assert(std::abs(-B + det) > 0);
-        double rv = A/(-B + det);
-        return rv;
+        return A/(-B + det);
     }
        
 public:
     radial_gradient_solver(const paint& pat)
         : color_gradient_solver(pat, pat.get_radial_gradient_data().get_color_ramp())
-        , m_data(pat.get_radial_gradient_data()) 
-        , m_c(m_data.get_cx(), m_data.get_cy()) 
-        , m_f(m_data.get_fx(), m_data.get_fy())
-        , m_r(m_data.get_r()) {
-        m_xf = identity().translated(-m_c[0], -m_c[1]).scaled(1/m_r);
-        m_f = R2(m_xf.apply(m_f));
-        m_mod_f = std::sqrt(m_f[0]*m_f[0] + m_f[1]*m_f[1]);
-        if(m_mod_f > 1.0f){
-            m_mod_f = 1.0f - EPS;
+        , m_data(pat.get_radial_gradient_data()) {
+        m_xf = identity().translated(-m_data.get_cx(), -m_data.get_cy()).scaled(1/m_data.get_r());
+        R2 f = R2(m_xf.apply(make_R2(m_data.get_fx(), m_data.get_fy())));
+        double mod_f = std::sqrt(f[0]*f[0] + f[1]*f[1]);
+        if(mod_f > 1.0f) { // if focus transformed is in circle boudary
+            mod_f = 1.0f - EPS;
         }
-        if(m_mod_f > EPS){
-            m_xf = m_xf.transformed(make_affinity(-m_f[0]/m_mod_f, -m_f[1]/m_mod_f, m_mod_f,  -m_f[1]/m_mod_f, m_f[0]/m_mod_f, 0));   
+        if(mod_f > EPS) { // if focus transformed isn't on origin
+            m_xf = m_xf.rotated(-f[0]/mod_f, f[1]/mod_f).translated(mod_f, 0);
         }
-        m_B = -m_mod_f;
-        m_C = m_mod_f*m_mod_f - 1;
+        m_B = -mod_f;
+        m_C = mod_f*mod_f - 1;
     }   
 };  
 
