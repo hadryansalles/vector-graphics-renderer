@@ -88,32 +88,32 @@ public:
     }
     virtual double in_t(const int i, const double t) const = 0;
     virtual void print() const = 0;
-    inline virtual bool implicit_hit(const double x, const double y) const {
+    inline virtual bool implicit_hit(double x, double y) const {
         (void) x;
         (void) y;
         return false;
     }
     inline bool intersect(const double x, const double y) const {
         if(!m_bbox.hit_right(x, y)){
-            if(m_bbox.hit_left(x, y) || (implicit_hit(x, y) && m_bbox.hit_inside(x, y))){
+            if(m_bbox.hit_left(x, y) || (m_bbox.hit_inside(x, y) && implicit_hit(x, y))){
                 return true;
             }
-            else if(m_bbox.hit_inside(x, y)){
-                R2 bisection_point;
-                double step = 0.5;
-                double t = 0.5;
-                do {
-                    step /= 2.0;
-                    bisection_point = bezier(t); 
-                    if(bisection_point[1] > y){
-                        t -= (double)m_dir*step;
-                    }
-                    else if(bisection_point[1] < y){
-                        t += (double)m_dir*step;
-                    }
-                } while(step > 0.000001);
-                return (x - bisection_point[0] < EPS);
-            }
+            // else if(m_bbox.hit_inside(x, y)){
+            //     R2 bisection_point;
+            //     double step = 0.5;
+            //     double t = 0.5;
+            //     do {
+            //         step /= 2.0;
+            //         bisection_point = bezier(t); 
+            //         if(bisection_point[1] > y){
+            //             t -= (double)m_dir*step;
+            //         }
+            //         else if(bisection_point[1] < y){
+            //             t += (double)m_dir*step;
+            //         }
+            //     } while(step > 0.000001);
+            //     return (x - bisection_point[0] < EPS);
+            // }
         }
         return false;
     }
@@ -141,31 +141,81 @@ class linear : public path_segment {
 private:
     R2 m_d;
 public:
-    inline linear(std::vector<R2> &points)
+    linear(std::vector<R2> points)
         : path_segment(points)
         , m_d(0, 0) {
         assert(points.size() == 2);
-        m_d = points[1] - points[0];
-    } 
+        m_d = points[1] - points[0];    
+    }
+    // inline linear(std::vector<R2> &points)
+    //     : path_segment(points)
+    //     , m_d(0, 0) {
+    //     assert(points.size() == 2);
+    //     m_d = points[1] - points[0];
+    // } 
     inline void print() const {
         printf("\tlin: (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1]);
     }
     inline double in_t(const int i, const double t) const {
         return (1-t)*m_points[0][i] + t*m_points[1][i];
     }
-    inline bool implicit_hit(const double x, const double y) const {
+    inline bool implicit_hit(double x, double y) const {
         return (m_d[1]*((x - m_points[0][0])*m_d[1] - (y - m_points[0][1])*m_d[0]) <= 0);
     }
 };
 
 class quadratic : public path_segment {
+private:
+    const linear m_diag; 
+    bool m_cvx;
+    const R2 a;
+    const R2 b;
+    const R2 c;
+    double con;
+    double px_2;
+    double py_2;
+    double px;
+    double py;
+    double px_py;
 public:
     inline quadratic(std::vector<R2> &points) 
-        : path_segment(points){
+        : path_segment(points)
+        , m_diag(std::vector<R2>{make_R2(0, 0), points[points.size()-1]-points[0]})
+        , m_cvx(false)
+        , a(points[0]-2*points[1]+points[2])
+        , b(-2*points[0]+2*points[1])
+        , c(points[0]) {
         assert(points.size() == 3);
+        // con = a[0]*a[0]*c[1]*c[1] - 2*a[0]*a[1]*c[0]*c[1] - a[0]*b[0]*b[1]*c[1] + a[0]*b[1]*b[1]*c[0] + a[1]*a[1]*c[0]*c[0]
+        //     + a[1]*b[0]*b[0]*c[1] - a[1]*b[0]*b[1]*c[0];
+        // px_2 = a[1]*a[1];
+        // py_2 = a[1]*a[1];
+        // px = 2*a[0]*a[1]*c[1] - a[0]*b[1]*b[1] - 2*a[1]*a[1]*c[0] + a[1]*b[0]*b[1];
+        // py = -2*a[0]*a[0]*c[1] + 2*a[0]*a[1]*c[0] + a[0]*b[0]*b[1] - a[1]*b[0]*b[0];
+        // px_py = -2*a[0]*a[1];
+        if(m_diag.implicit_hit(points[1][0]-points[0][0], points[1][1]-points[0][1])) {
+            m_cvx = true;
+        }
     }
     inline virtual double in_t(const int i, const double t) const {
-        return m_points[0][i]*(1-t)*(1-t) + m_points[1][i]*2*(t - t*t) + m_points[2][i]*t*t;
+        //return m_points[0][i]*(1-t)*(1-t) + m_points[1][i]*2*(t - t*t) + m_points[2][i]*t*t;
+        return t*t*(a[i]) + t*(b[i]) + (c[i]);
+    }
+    inline bool implicit_hit(double x, double y) const {
+        double x1 = m_points[1][0]-m_points[0][0];
+        double y1 = m_points[1][1]-m_points[0][1];
+        double x2 = m_points[2][0]-m_points[0][0];
+        double y2 = m_points[2][1]-m_points[0][1];
+        x -= m_points[0][0];
+        y -= m_points[0][1];
+        if(m_cvx) {
+            return m_diag.implicit_hit(x, y) && y*((4.0*x1*x1 - 4.0*x1*x2 + x2*x2)*y + 4.0*x1*x2*y1 - 4.0*x1*x1*y2) + x*(-4.0*x2*y1*y1 + 4*x1*y1*y2 + 
+               y*(-8.0*x1*y1 + 4.0*x2*y1 + 4.0*x1*y2 - 2.0*x2*y2) + x*(4.0*y1*y1 - 4.0*y1*y2 + y2*y2)) > 0;    
+        }
+        else{
+            return m_diag.implicit_hit(x, y) || y*((4.0*x1*x1 - 4.0*x1*x2 + x2*x2)*y + 4.0*x1*x2*y1 - 4.0*x1*x1*y2) + x*(-4.0*x2*y1*y1 + 4*x1*y1*y2 + 
+               y*(-8.0*x1*y1 + 4.0*x2*y1 + 4.0*x1*y2 - 2.0*x2*y2) + x*(4.0*y1*y1 - 4.0*y1*y2 + y2*y2)) <= 0;
+        }
     }
     inline virtual void print() const {
         printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
@@ -189,19 +239,29 @@ public:
 };
 
 class cubic : public path_segment {
+    R2 a;
+    R2 b;
+    R2 c;
+    R2 d;
 public:
     inline cubic(std::vector<R2> &points)
-        : path_segment(points){
+        : path_segment(points)
+        , a(-points[0] + 3*points[1] - 3*points[2] + points[3])
+        , b(3*points[0] - 6*points[1] + 3*points[2])
+        , c(-3*points[0] + 3*points[1])
+        , d(points[0]) {
         assert(points.size() == 4);
     }
     inline void print() const {
         printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
     }
     inline double in_t(const int i, const double t) const {
-        return m_points[0][i]*(1-t)*(1-t)*(1-t) + 
-            m_points[1][i]*3.0*(1-t)*(1-t)*t + 
-            m_points[2][i]*3.0*t*t*(1-t) + 
-            m_points[3][i]*t*t*t;
+        return (a[i])*t*t*t + (b[i])*t*t + (c[i])*t + (d[i]);
+    //     return m_points[0][i]*(1-t)*(1-t)*(1-t) + 
+    //         m_points[1][i]*3.0*(1-t)*(1-t)*t + 
+    //         m_points[2][i]*3.0*t*t*(1-t) + 
+    //         m_points[3][i]*t*t*t;
+    // 
     }
 };
 
@@ -466,11 +526,11 @@ public:
     inline void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
         std::vector<R2> den{make_R2(1, 1), make_R2(w1, w1), make_R2(1, 1)};
-        m_path.push_back(new rational(points, den));    
+        //m_path.push_back(new rational(points, den));    
     };
     inline void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3)};
-        m_path.push_back(new cubic(points));
+        //m_path.push_back(new cubic(points));
     };
     inline void do_begin_contour(rvgf x0, rvgf y0){
         m_last_move = make_R2(x0, y0);
