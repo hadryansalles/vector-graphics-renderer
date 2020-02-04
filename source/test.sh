@@ -8,25 +8,12 @@ heavy=("blue_butterfly"
        "anatomical_heart"
        "paris-30k"
        "blender_freestyle"
-       "bunny_dense_flat"
-       "carrera"
-       "red_racing_car"
        "relatorio"
        "colorado"
-       "samurai"
-       "welsh_dragon"
-       "wormian_bones"
        "contour"
        "hawaii"
-       "page_1"
-       "page_2"
-       "pirate-with-knife"
-       "puss-in-boots"
        "roads"
-       "inkboard"
-       "spiral"
-       "spirograph"
-       "gs_snowflak")
+       "inkboard")
 
 if [[ "$1" =~ "heavy" ]]; then
     heavy=()
