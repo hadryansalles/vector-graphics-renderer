@@ -1,0 +1,26 @@
+<?xml version="1.0" standalone="no"?>
+<svg
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:cc="http://creativecommons.org/ns#"
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:svg="http://www.w3.org/2000/svg"
+  xmlns="http://www.w3.org/2000/svg"
+  version="1.1"
+  preserveAspectRatio="none"
+  width="320" height="202"
+  viewBox="0 0 320 202">
+  <defs>
+    <radialGradient id="gradient0" gradientUnits="userSpaceOnUse" cx="357.01300048828" cy="223.89100646973" fx="357.01300048828" fy="223.89100646973" r="166.08999633789" spreadMethod="pad" gradientTransform="matrix(0.0713777,0,0,-0.0713777,73.7429,120.538)">
+      <stop offset="0" stop-color="white"/>
+      <stop offset="0.32699999213219" stop-color="rgb(238,238,238)"/>
+      <stop offset="0.68900001049042" stop-color="rgb(199,199,199)"/>
+      <stop offset="1" stop-color="white"/>
+    </radialGradient>
+  </defs>
+  <g transform="matrix(1,0,0,-1,0,202)"> <!-- invert y -->
+    <g transform="translate(10,10)"> <!-- content transformation-->
+      <path id="shape0" fill-rule="nonzero" fill="url(#gradient0)" d="M 108.268 99.4711 C 108.268 94.4797 104.217 90.4288 99.2256 90.4288 94.2343 90.4288 90.1834 94.4797 90.1834 99.4711 90.1834 104.462 94.2343 108.513 99.2256 108.513 104.217 108.513 108.268 104.462 108.268 99.4711 "/>
+    </g>
+  </g>
+</svg>

@@ -31,7 +31,7 @@
 
 #include "rvg-driver-png.h"
 
-#define EPS 0.0000000000001
+#define EPS 0.0001
 
 namespace rvg {
     namespace driver {
@@ -230,7 +230,7 @@ protected:
     const xform m_inv_xf;
     double spread(double t) const {
         double rt = t;
-        if(t < 0 && t > 1) {
+        if(t < 0 || t > 1) {
             switch(m_ramp.get_spread()){
                 case e_spread::clamp:
                     rt = std::max(0.0, std::min(1.0, t));
@@ -266,7 +266,7 @@ protected:
         }
         else{
             assert(stops.size() > 1);
-            for(int i = 0, j = 1; j < stops.size(); i++, j++){
+            for(unsigned int i = 0, j = 1; j < stops.size(); i++, j++){
                 if(stops[j].get_offset() >= t){
                     double amp = stops[j].get_offset() - stops[i].get_offset();
                     t -= stops[i].get_offset();
@@ -296,8 +296,7 @@ public:
     {}
     virtual RGBA8 solve(double x, double y) const {
         RGBA8 color(0, 0, 0, 0);
-        RP2 pp(m_inv_xf.apply(make_RP2(x, y)));
-        R2 p(pp[0]/pp[2], pp[1]/pp[2]);
+        R2 p(m_inv_xf.apply(make_R2(x, y)));
         double t = spread(convert(p));
         if(t != -1) {
             color = wrap(t);
@@ -342,8 +341,9 @@ private:
         double det = B*B - A*C;
         assert(det >= 0);
         det = std::sqrt(det);
-        //assert(std::abs(-B + det) > EPS);
-        return A/(-B + det);
+        assert(std::abs(-B + det) > 0);
+        double rv = A/(-B + det);
+        return rv;
     }
        
 public:
@@ -356,7 +356,7 @@ public:
         m_xf = identity().translated(-m_c[0], -m_c[1]).scaled(1/m_r);
         m_f = R2(m_xf.apply(m_f));
         m_mod_f = std::sqrt(m_f[0]*m_f[0] + m_f[1]*m_f[1]);
-        if(m_mod_f > 1.0f - EPS){
+        if(m_mod_f > 1.0f){
             m_mod_f = 1.0f - EPS;
         }
         if(m_mod_f > EPS){
@@ -520,13 +520,12 @@ private:
         monotonic_builder path_builder;
         path_data::const_ptr path_data = s.as_path_data_ptr(post);
         const xform s_xf = post*top_xf()*s.get_xf();
-        p.transformed(top_xf());
         path_data->iterate(make_input_path_f_close_contours(
                            make_input_path_f_xform(s_xf,
                            make_input_path_f_downgrade_degenerate(
                            make_input_path_f_monotonize(
                            path_builder)))));
-        acc.add(new scene_object(path_builder.get(), wr, p));
+        acc.add(new scene_object(path_builder.get(), wr, p.transformed(top_xf())));
     }
     inline void do_begin_transform(uint16_t depth, const xform &xf){
         (void) depth;
@@ -570,7 +569,11 @@ RGBA8 sample(const accelerated& a, float x, float y){
     for(auto obj_it = a.objects.rbegin(); obj_it != a.objects.rend(); ++obj_it) {
         auto obj = (*obj_it);
         if(obj->hit(x, y)){
-            c = over(pre_multiply(c), pre_multiply(obj->get_color(x, y)));
+            auto cop = pre_multiply(obj->get_color(x, y));
+            c = over(c, cop);
+            if((int) c[3] == 255) {
+                return c;
+            }
         }
     }
     return over(c, make_rgba8(255, 255, 255, 255));

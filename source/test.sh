@@ -25,7 +25,8 @@ heavy=("blue_butterfly"
        "roads"
        "inkboard"
        "spiral"
-       "spirograph")
+       "spirograph"
+       "gs_snowflak")
 
 if [[ "$1" =~ "heavy" ]]; then
     heavy=()
