@@ -1,0 +1,58 @@
+2D Computer Graphics
+2020.0
+
+Fourth assignment: Implicit intersection tests
+-----------------------------------
+
+Now that you can render all shape primitives with gradients
+and transparency, it is time to investigate acceleration
+alternatives. In Lua, it is unlikely to improve performance
+too much, since there are other bottlenecks. In C++,
+however, this should lead to real improvements.  Even then,
+implicitization will be most useful when your implementation
+is vectorized or parallelized in some way. Your mileage may
+vary.
+
+1) Implicitization
+
+During preprocessing, convert all segments to the
+representation that we discussed in class. First, test the
+bounding box to rule out or confirm obvious intersections.
+
+Inside the bounding box, more work is needed. For linear
+segments, all you need is the implicit line equation we
+discussed in class.
+
+For monotonic quadratics (rational or integral), you have to
+test against the line segment that connects the endpoints.
+The test for that line segment itself can use the implicit
+representation we already developed for line segments. For
+the implicit quadratic, I suggest you use the
+resultant-based implicititization, find the coefficients of
+each term, and put the expression in Horner form. It is much
+simpler than the affine-based implicitization.
+
+For monotonic cubics, even more work is needed.  You have to
+break them at inflections and at double points.  We
+discussed in class how to find the parameters where
+inflections and double points happen. Then, for each piece,
+you need to compute the intersection of the tangents.
+Together with this intersection, the endpoints form a
+triangle. You have to test against the sides of this
+triangle. Once again, the tests against the sides can use
+the implicit representation for lines that we discussed in
+class. For the implicit cubic, I suggest again you use the
+resultant-based implicitization in Horner form.
+
+2) Handing in your assignment
+
+Create a directory with "<first-name>-<last-name>" where
+<first-name> is your first name, and <last-name> is your
+last name. Place your file "render.lua" as well as all your
+new RVG test files inside this directory. Create a zip
+archive "<first-name>-<last-name>.zip" with the contents.
+Send the file to me (please carbon-copy your TA)
+as an attachment to an e-mail with the subject
+"[2dcg] Assignment 4".
+
+Good luck!
