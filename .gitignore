@@ -5,4 +5,6 @@
 *.so
 pngs-out
 .vscode
-a.png
+a.*
+due
+
