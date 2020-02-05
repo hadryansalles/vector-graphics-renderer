@@ -39,6 +39,9 @@ namespace rvg {
 
 
 class path_segment;
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
 
 class bouding_box {
 private:
@@ -84,11 +87,7 @@ public:
         m_points.clear();
     }
     virtual void print() const = 0;
-    inline virtual bool implicit_hit(double x, double y) const {
-        (void) x;
-        (void) y;
-        return false;
-    }
+    virtual bool implicit_hit(double x, double y) const = 0;
     inline bool intersect(const double x, const double y) const {
         if(!m_bbox.hit_right(x, y) 
         && (m_bbox.hit_left(x, y) || (m_bbox.hit_inside(x, y) && implicit_hit(x, y)))){
@@ -144,7 +143,7 @@ public:
 };
 
 class quadratic : public path_segment {
-private:
+protected:
     const R2 m_p1;
     const R2 m_p2;
     const linear m_diag; 
@@ -154,66 +153,140 @@ private:
     const double m_C;
     const double m_D;
     const double m_E;
+    const int m_der;
+    const double m_w;
 public:
-    inline quadratic(std::vector<R2> &points) 
+    quadratic(std::vector<R2> &points, double w = 1.0) 
         : path_segment(points)
-        , m_p1(points[1]-points[0])
+        , m_p1((points[1]-points[0])*w)
         , m_p2(points[2]-points[0])
         , m_diag(std::vector<R2>{make_R2(0, 0), m_p2})
         , m_cvx(m_diag.implicit_hit(m_p1[0], m_p1[1]))
-        , m_A(4.0*m_p1[0]*m_p1[0]-4.0*m_p1[0]*m_p2[0]+m_p2[0]*m_p2[0])
+        , m_A(4.0*m_p1[0]*m_p1[0]-4.0*w*m_p1[0]*m_p2[0]+m_p2[0]*m_p2[0])
         , m_B(4.0*m_p1[0]*m_p2[0]*m_p1[1]-4.0*m_p1[0]*m_p1[0]*m_p2[1])
         , m_C(-4.0*m_p2[0]*m_p1[1]*m_p1[1]+4*m_p1[0]*m_p1[1]*m_p2[1])
-        , m_D(-8.0*m_p1[0]*m_p1[1]+4.0*m_p2[0]*m_p1[1]+4.0*m_p1[0]*m_p2[1]-2.0*m_p2[0]*m_p2[1])
-        , m_E(4.0*m_p1[1]*m_p1[1]-4.0*m_p1[1]*m_p2[1]+m_p2[1]*m_p2[1]) {
+        , m_D(-8.0*m_p1[0]*m_p1[1]+4.0*w*m_p2[0]*m_p1[1]+4.0*w*m_p1[0]*m_p2[1]-2.0*m_p2[0]*m_p2[1])
+        , m_E(4.0*m_p1[1]*m_p1[1]-4.0*w*m_p1[1]*m_p2[1]+m_p2[1]*m_p2[1]) 
+        , m_der(sgn(2*m_p2[1]*(-m_p2[0]*m_p1[1]+m_p1[0]*m_p2[1])))
+        , m_w(w) {
         assert(points.size() == 3);
     }
-    inline bool implicit_hit(double x, double y) const {
+    virtual bool implicit_hit(double x, double y) const {
         x -= m_points[0][0];
         y -= m_points[0][1];
-        if(m_cvx) {
-            return m_diag.implicit_hit(x, y) 
-                && ((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E)) > 0);    
+        if(m_cvx) { 
+            return m_diag.implicit_hit(x, y) && m_der*sgn((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E))) <= 0;    
         }
         else{
-            return m_diag.implicit_hit(x, y) 
-                || ((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E)) <= 0);
+            return m_diag.implicit_hit(x, y) || m_der*sgn((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E))) <= 0;
         }
     }
-    inline virtual void print() const {
+    virtual void print() const {
         printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
     }
 };
 
 class rational : public quadratic { 
-    quadratic den;
 public:
-    inline rational(std::vector<R2> &points, std::vector<R2> &den_points)
-        : quadratic(points)
-        , den(den_points) {
+    rational(std::vector<R2> &points, double w)
+        : quadratic(points, w)
+    {}
+    bool implicit_hit(double x, double y) const {
+        return quadratic::implicit_hit(x, y);
     }
-    inline void print() const {
+    void print() const {
         quadratic::print();
-        den.print();
+        printf("\t\tw:%.2f\n", m_w);
     }
 };
 
 class cubic : public path_segment {
-    R2 a;
-    R2 b;
-    R2 c;
-    R2 d;
+    long int A;
+    long int B;
+    long int C;
+    long int D;
+    long int E;
+    long int F;
+    long int G;
+    long int H;
+    long int I;
+    const linear m_diag;
+    const bool m_cvx;
+    int m_der;
 public:
     inline cubic(std::vector<R2> &points)
         : path_segment(points)
-        , a(-points[0] + 3*points[1] - 3*points[2] + points[3])
-        , b(3*points[0] - 6*points[1] + 3*points[2])
-        , c(-3*points[0] + 3*points[1])
-        , d(points[0]) {
+        , m_diag(std::vector<R2>{make_R2(0, 0), points[3]-points[0]})
+        , m_cvx(m_diag.implicit_hit(points[1][0]-points[0][0], points[1][1]-points[0][1])) {
         assert(points.size() == 4);
+        double x1, x2, x3;
+        double y1, y2, y3;
+        x1 = (points[1] - points[0]).get_x();
+        y1 = (points[1] - points[0]).get_y();
+        x2 = (points[2] - points[0]).get_x();
+        y2 = (points[2] - points[0]).get_y();
+        x3 = (points[3] - points[0]).get_x();
+        y3 = (points[3] - points[0]).get_y();
+        A = -27*x1*x3*x3*y1*y1 + 81*x1*x2*x3*y1*y2 - 81*x1*x1*x3*y2*y2 - 
+             81*x1*x2*x2*y1*y3 + 54*x1*x1*x3*y1*y3 + 81*x1*x1*x2*y2*y3 - 
+             27*x1*x1*x1*y3*y3;
+        B = (-27*x1*x1*x1 + 81*x1*x1*x2 - 81*x1*x2*x2 + 27*x2*x2*x2 - 27*x1*x1*x3 + 
+              54*x1*x2*x3 - 27*x2*x2*x3 - 9*x1*x3*x3 + 9*x2*x3*x3 - 
+              x3*x3*x3);
+        C = 81*x1*x2*x2*y1 - 54*x1*x1*x3*y1 - 81*x1*x2*x3*y1 + 
+            54*x1*x3*x3*y1 - 9*x2*x3*x3*y1 - 81*x1*x1*x2*y2 + 
+            162*x1*x1*x3*y2 - 81*x1*x2*x3*y2 + 27*x2*x2*x3*y2 - 
+            18*x1*x3*x3*y2 + 54*x1*x1*x1*y3 - 81*x1*x1*x2*y3 + 81*x1*x2*x2*y3 - 
+            27*x2*x2*x2*y3 - 54*x1*x1*x3*y3 + 27*x1*x2*x3*y3;
+        D = 27*x3*x3*y1*y1*y1 - 81*x2*x3*y1*y1*y2 + 81*x1*x3*y1*y2*y2 + 
+            81*x2*x2*y1*y1*y3 - 54*x1*x3*y1*y1*y3 - 81*x1*x2*y1*y2*y3 + 
+            27*x1*x1*y1*y3*y3;
+        E = -81*x2*x2*y1*y1 + 108*x1*x3*y1*y1 + 81*x2*x3*y1*y1 - 
+            54*x3*x3*y1*y1 - 243*x1*x3*y1*y2 + 81*x2*x3*y1*y2 + 
+            27*x3*x3*y1*y2 + 81*x1*x1*y2*y2 + 81*x1*x3*y2*y2 - 54*x2*x3*y2*y2 - 
+            108*x1*x1*y1*y3 + 243*x1*x2*y1*y3 - 81*x2*x2*y1*y3 - 
+            9*x2*x3*y1*y3 - 81*x1*x1*y2*y3 - 81*x1*x2*y2*y3 + 
+            54*x2*x2*y2*y3 + 9*x1*x3*y2*y3 + 54*x1*x1*y3*y3 - 27*x1*x2*y3*y3;
+        F = 81*x1*x1*y1 - 162*x1*x2*y1 + 81*x2*x2*y1 + 54*x1*x3*y1 - 
+            54*x2*x3*y1 + 9*x3*x3*y1 - 81*x1*x1*y2 + 162*x1*x2*y2 - 
+            81*x2*x2*y2 - 54*x1*x3*y2 + 54*x2*x3*y2 - 9*x3*x3*y2 + 
+            27*x1*x1*y3 - 54*x1*x2*y3 + 27*x2*x2*y3 + 18*x1*x3*y3 - 
+            18*x2*x3*y3 + 3*x3*x3*y3;
+        G = -54*x3*y1*y1*y1 + 81*x2*y1*y1*y2 + 81*x3*y1*y1*y2 - 81*x1*y1*y2*y2 - 
+            81*x3*y1*y2*y2 + 27*x3*y2*y2*y2 + 54*x1*y1*y1*y3 - 162*x2*y1*y1*y3 + 
+            54*x3*y1*y1*y3 + 81*x1*y1*y2*y3 + 81*x2*y1*y2*y3 - 
+            27*x3*y1*y2*y3 - 27*x2*y2*y2*y3 - 54*x1*y1*y3*y3 + 
+            18*x2*y1*y3*y3 + 9*x1*y2*y3*y3;
+        H = -81*x1*y1*y1 + 81*x2*y1*y1 - 27*x3*y1*y1 + 162*x1*y1*y2 - 
+            162*x2*y1*y2 + 54*x3*y1*y2 - 81*x1*y2*y2 + 81*x2*y2*y2 - 
+            27*x3*y2*y2 - 54*x1*y1*y3 + 54*x2*y1*y3 - 18*x3*y1*y3 + 
+            54*x1*y2*y3 - 54*x2*y2*y3 + 18*x3*y2*y3 - 9*x1*y3*y3 + 
+            9*x2*y3*y3 - 3*x3*y3*y3;
+        I = 27*y1*y1*y1 - 81*y1*y1*y2 + 81*y1*y2*y2 - 27*y2*y2*y2 + 27*y1*y1*y3 - 
+            54*y1*y2*y3 + 27*y2*y2*y3 + 9*y1*y3*y3 - 9*y2*y3*y3 + y3*y3*y3;
+        m_der = sgn((y1 - y2 - y3)*(-x3*x3*(4*y1*y1 - 2*y1*y2 + y2*y2) + 
+                    x1*x1*(9*y2*y2 - 6*y2*y3 - 4*y3*y3) + 
+                    x2*x2*(9*y1*y1 - 12*y1*y3 - y3*y3) + 
+                    2*x1*x3*(-y2*(6*y2 + y3) + y1*(3*y2 + 4*y3)) - 
+                    2*x2*(x3*(3*y1*y1 - y2*y3 + y1*(-6*y2 + y3)) + 
+                    x1*(y1*(9*y2 - 3*y3) - y3*(6*y2 + y3))))
+        );
+    }
+    bool implicit_hit(double x, double y) const {
+        x -= m_points[0][0];
+        y -= m_points[0][1];
+        printf("%.2f\n", y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)));
+        return (m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)))) <= 0;
+        // if(m_cvx) {
+        //     m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I))) <= 0;
+        // }
+        // else {
+        //     m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I))) <= 0;
+        // }
     }
     inline void print() const {
-        printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
+        printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], 
+                                                                                m_points[2][0], m_points[2][1], m_points[3][0], m_points[3][1]);
     }
 };
 
@@ -477,12 +550,11 @@ public:
     }
     inline void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
-        std::vector<R2> den{make_R2(1, 1), make_R2(w1, w1), make_R2(1, 1)};
-        //m_path.push_back(new rational(points, den));    
+        m_path.push_back(new rational(points, w1));    
     };
     inline void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3)};
-        //m_path.push_back(new cubic(points));
+        m_path.push_back(new cubic(points));
     };
     inline void do_begin_contour(rvgf x0, rvgf y0){
         m_last_move = make_R2(x0, y0);
@@ -607,6 +679,7 @@ void render(accelerated &a, const window &w, const viewport &v,
     }
     std::cout <<("\n");
     store_png<uint8_t>(out, out_image);
+    a.print();
     a.destroy();
 }
 
