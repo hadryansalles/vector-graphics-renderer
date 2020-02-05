@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-
 #include "rvg-image.h"
 #include "rvg-viewport.h"
 #include "rvg-window.h"

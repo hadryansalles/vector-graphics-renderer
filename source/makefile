@@ -219,7 +219,7 @@ rvg-util.o: INC += $(LP_INC)
 rvg-driver-distroke.o: INC += $(LUA_INC)
 rvg-driver-svg.o: INC += $(LUA_INC)
 rvg-driver-eps.o: INC += $(LUA_INC)
-rvg-driver-png.o: INC += $(LUA_INC)
+rvg-driver-png.o: INC += $(LUA_INC) 
 rvg-driver-rvg-lua.o: INC += $(LUA_INC)
 rvg-driver-rvg-cpp.o: INC += $(LUA_INC)
 rvg-driver-nvpr.o: INC += $(LUA_INC) $(EGL_INC)
@@ -558,7 +558,7 @@ driver/distroke.so: $(SO_DISTROKE_DRV_OBJ)
 
 driver/png.so: $(SO_PNG_DRV_OBJ)
 	mkdir -p driver
-	$(CXX) $(SOLDFLAGS) -o $@ $^ $(PNG_LIB) $(B64_LIB) $(LP_LIB) $
+	$(CXX) $(SOLDFLAGS) -o $@ $^ $(PNG_LIB) $(B64_LIB) $(OMP_LIB) $(LP_LIB) 
 
 driver/svg.so: $(SO_SVG_DRV_OBJ)
 	mkdir -p driver

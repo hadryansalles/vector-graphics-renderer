@@ -15,6 +15,7 @@
 #include "rvg-spread.h"
 #include "rvg-rgba.h"
 #include "rvg-xform.h"
+#include "omp.h"
 
 #include "rvg-winding-rule.h"
 #include "rvg-i-input-path.h"
@@ -56,11 +57,17 @@ public:
         m_p1 = make_R2(std::max(first.get_x(), last.get_x()), std::max(first.get_y(), last.get_y()));
     }
     inline bouding_box(std::vector<path_segment*> &path);
+    inline bool hit_up(const double x, const double y) const {
+        return y >= m_p1.get_y();
+    }
+    inline bool hit_down(const double x, const double y) const {
+        return y < m_p0.get_y();
+    }
     inline bool hit_left(const double x, const double y) const {
-        return y >= m_p0.get_y() && y < m_p1.get_y() && x <= m_p0.get_x();
+        return x <= m_p0.get_x();
     }
     inline bool hit_right(const double x, const double y) const {
-        return y >= m_p0.get_y() && y < m_p1.get_y() && x > m_p1.get_x();
+        return x > m_p1.get_x();
     }
     inline bool hit_inside(const double x, const double y) const {
         return y >= m_p0.get_y() && y < m_p1.get_y() && x >= m_p0.get_x() && x < m_p1.get_x();
@@ -89,11 +96,8 @@ public:
     virtual void print() const = 0;
     virtual bool implicit_hit(double x, double y) const = 0;
     inline bool intersect(const double x, const double y) const {
-        if(!m_bbox.hit_right(x, y) 
-        && (m_bbox.hit_left(x, y) || (m_bbox.hit_inside(x, y) && implicit_hit(x, y)))){
-            return true;
-        }
-        return false;
+        return !(m_bbox.hit_up(x, y) || m_bbox.hit_right(x, y) || m_bbox.hit_down(x, y)) 
+              &&(m_bbox.hit_left(x,  y) || implicit_hit(x, y));
     }
     inline int get_dir() const {
         return m_dir;
@@ -158,7 +162,7 @@ protected:
 public:
     quadratic(std::vector<R2> &points, double w = 1.0) 
         : path_segment(points)
-        , m_p1((points[1]-points[0])*w)
+        , m_p1(points[1]-points[0]*w)
         , m_p2(points[2]-points[0])
         , m_diag(std::vector<R2>{make_R2(0, 0), m_p2})
         , m_cvx(m_diag.implicit_hit(m_p1[0], m_p1[1]))
@@ -171,18 +175,17 @@ public:
         , m_w(w) {
         assert(points.size() == 3);
     }
-    virtual bool implicit_hit(double x, double y) const {
+    bool implicit_hit(double x, double y) const {
         x -= m_points[0][0];
         y -= m_points[0][1];
-        if(m_cvx) { 
-            return m_diag.implicit_hit(x, y) && m_der*sgn((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E))) <= 0;    
-        }
-        else{
-            return m_diag.implicit_hit(x, y) || m_der*sgn((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E))) <= 0;
-        }
+        return(m_cvx && (m_diag.implicit_hit(x, y) && hit_me(x, y)))
+           ||(!m_cvx && (m_diag.implicit_hit(x, y) || hit_me(x, y)));
     }
     virtual void print() const {
         printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], m_points[2][0], m_points[2][1]);
+    }
+    bool hit_me(double x, double y) const {
+        return m_der*sgn((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E))) <= 0;
     }
 };
 
@@ -210,7 +213,7 @@ class cubic : public path_segment {
     long int G;
     long int H;
     long int I;
-    const linear m_diag;
+    const linear m_diag; 
     const bool m_cvx;
     int m_der;
 public:
@@ -275,18 +278,15 @@ public:
     bool implicit_hit(double x, double y) const {
         x -= m_points[0][0];
         y -= m_points[0][1];
-        printf("%.2f\n", y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)));
-        return (m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)))) <= 0;
-        // if(m_cvx) {
-        //     m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I))) <= 0;
-        // }
-        // else {
-        //     m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I))) <= 0;
-        // }
+        return(m_cvx && (m_diag.implicit_hit(x, y) && hit_me(x, y)))
+           ||(!m_cvx && (m_diag.implicit_hit(x, y) || hit_me(x, y)));
     }
     inline void print() const {
         printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], 
                                                                                 m_points[2][0], m_points[2][1], m_points[3][0], m_points[3][1]);
+    }
+    bool hit_me(double x, double y) const {
+        return (m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)))) <= 0;
     }
 };
 
@@ -666,7 +666,6 @@ void render(accelerated &a, const window &w, const viewport &v,
 
     image<uint8_t, 4> out_image;
     out_image.resize(width, height);
-
     RGBA8 s_color;
     for (int i = 1; i <= height; i++) {
         float y = yb+i-1.+.5f;
@@ -679,7 +678,6 @@ void render(accelerated &a, const window &w, const viewport &v,
     }
     std::cout <<("\n");
     store_png<uint8_t>(out, out_image);
-    a.print();
     a.destroy();
 }
 
