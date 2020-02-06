@@ -61,15 +61,19 @@ public:
     }
     inline bouding_box(std::vector<path_segment*> &path);
     inline bool hit_up(const double x, const double y) const {
+        (void) x;
         return y >= m_p1.get_y();
     }
     inline bool hit_down(const double x, const double y) const {
+        (void) x;
         return y < m_p0.get_y();
     }
     inline bool hit_left(const double x, const double y) const {
+        (void) y;
         return x <= m_p0.get_x();
     }
     inline bool hit_right(const double x, const double y) const {
+        (void) y;
         return x > m_p1.get_x();
     }
     inline bool hit_inside(const double x, const double y) const {
@@ -289,20 +293,20 @@ public:
         R2 v0(0, 0);
         R2 v1;
         R2 v2(x3, y3);
-        if(std::abs(x1) < EPS && std::abs(y1) < EPS) {
+        if(std::abs(x1*x1) < EPS && std::abs(y1*y1) < EPS) {
             // p0 = p1
             // fazer triangulo com p0, p2, p3
             v1 = make_R2(x2, y2);
-            printf("p0 = p1\n");
         }
-        else if(std::abs(x3-x2) < EPS && std::abs(y3-y2) < EPS) {
+        else if(std::abs(x3-x2)*std::abs(x3-x2) < EPS && std::abs(y3-y2)*std::abs(y3-y2) < EPS) {
             // p3 = p2
             // fazer triangulo com p0, p1, p3;
             v1 = make_R2(x1, y1);
-            printf("p3 = p2\n");
+        }
+        else if(std::abs(x2-x1)*std::abs(x2-x1) < EPS && std::abs(y2-y1)*std::abs(y2-y1) < EPS){
+            v1 = make_R2(x2, y2);
         }
         else {
-            printf("n\n");
             v1 = make_R2(-x1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1), -y1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1));
         }
         //printf(": %.2f, %.2f\n", v1[0], v1[1]);
@@ -313,16 +317,16 @@ public:
     bool hit_inside_triangle(double x, double y) const {
         int sum = 0;
         for(auto seg : m_tri) {
-            if(seg.implicit_hit(x, y)) {
-                sum++;
+            if(seg.intersect(x, y)) {
+                sum += seg.get_dir();
             }
         }
-        return sum == 1;
+        return sum%2 != 0;
     }
     bool hit_triangle_left(double x, double y) const {
         int sum = 0;
         for(auto seg : m_tri) {
-            if(seg.implicit_hit(x, y)) {
+            if(seg.intersect(x, y)) {
                 sum++;
             }
         }
@@ -334,7 +338,7 @@ public:
     bool implicit_hit(double x, double y) const {
         x -= m_points[0][0];
         y -= m_points[0][1];
-        return (hit_triangle_left(x+m_points[0][0], y+m_points[0][1]) || (hit_inside_triangle(x+m_points[0][0], y+m_points[0][1])));
+        return (hit_triangle_left(x+m_points[0][0], y+m_points[0][1]) || (hit_inside_triangle(x+m_points[0][0], y+m_points[0][1]) && hit_me(x, y)));
     }
     inline void print() const {
         printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], 
@@ -746,7 +750,6 @@ void render(accelerated &a, const window &w, const viewport &v,
         }
     }
     std::cout <<("\n");
-    a.debug(out_image);
     store_png<uint8_t>(out, out_image);
     a.destroy();
 }
