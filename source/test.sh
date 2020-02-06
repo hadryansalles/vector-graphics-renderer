@@ -29,7 +29,6 @@ quad=("parabola1"
 
 heavy=("blue_butterfly"
        "anatomical_heart"
-       "bunny_dense_flat"
        "paris-30k"
        "blender_freestyle"
        "relatorio"
