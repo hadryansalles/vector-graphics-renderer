@@ -48,12 +48,9 @@ private:
     R2 m_p0;
     R2 m_p1;
 public:
-    inline bouding_box(std::vector<R2> &points) {
-        assert(points.size() > 1);
-        R2 first = points[0];
-        R2 last = points[points.size()-1];
-        m_p0 = make_R2(std::min(first.get_x(), last.get_x()), std::min(first.get_y(), last.get_y()));
-        m_p1 = make_R2(std::max(first.get_x(), last.get_x()), std::max(first.get_y(), last.get_y()));
+    bouding_box(const R2 &first, const R2 &last) {
+        m_p0 = make_R2(std::min(first[0], last[0]), std::min(first[1], last[1]));
+        m_p1 = make_R2(std::max(first[0], last[0]), std::max(first[1], last[1]));
     }
     inline bouding_box(std::vector<path_segment*> &path);
     inline bool hit_up(const double x, const double y) const {
@@ -79,15 +76,15 @@ public:
 
 class path_segment {
 protected:
-    R2 m_pi;
-    R2 m_pf;
+    const R2 m_pi;
+    const R2 m_pf;
     const bouding_box m_bbox; // segment bouding box
     int m_dir;
 public:
-    inline path_segment(std::vector<R2> &points)
-        : m_pi(points[0])
-        , m_pf(points[points.size()-1])
-        , m_bbox(points) 
+    path_segment(const R2 &p0, const R2 &p1)
+        : m_pi(p0)
+        , m_pf(p1)
+        , m_bbox(m_pi, m_pf) 
         , m_dir(1) { 
         if(m_pi[1] > m_pf[1]){
             m_dir = -1;
@@ -128,15 +125,13 @@ bouding_box::bouding_box(std::vector<path_segment*> &path) {
 
 class linear : public path_segment {
 private:
-    R2 m_d;
+    const R2 m_d;
 public:
-    linear(std::vector<R2> points)
-        : path_segment(points)
-        , m_d(0, 0) {
-        assert(points.size() == 2);
-        m_d = points[1] - points[0];    
-    }
-    inline bool implicit_hit(double x, double y) const {
+    linear(const R2 &p0, const R2 &p1)
+        : path_segment(p0, p1)
+        , m_d(p1-p0) 
+    {}
+    bool implicit_hit(double x, double y) const {
         return (m_d[1]*((x - m_pi[0])*m_d[1] - (y - m_pi[1])*m_d[0]) <= 0);
     }
 };
@@ -156,10 +151,10 @@ protected:
     const double m_w;
 public:
     quadratic(std::vector<R2> &points, double w = 1.0) 
-        : path_segment(points)
+        : path_segment(points[0], points[points.size()-1])
         , m_p1(points[1]-points[0]*w)
         , m_p2(points[2]-points[0])
-        , m_diag(std::vector<R2>{make_R2(0, 0), m_p2})
+        , m_diag(make_R2(0, 0), m_p2)
         , m_cvx(m_diag.implicit_hit(m_p1[0], m_p1[1]))
         , m_A(4.0*m_p1[0]*m_p1[0]-4.0*w*m_p1[0]*m_p2[0]+m_p2[0]*m_p2[0])
         , m_B(4.0*m_p1[0]*m_p2[0]*m_p1[1]-4.0*m_p1[0]*m_p1[0]*m_p2[1])
@@ -181,13 +176,6 @@ public:
     }
 };
 
-class rational : public quadratic { 
-public:
-    rational(std::vector<R2> &points, double w)
-        : quadratic(points, w)
-    {}
-};
-
 class cubic : public path_segment {
     long int A;
     long int B;
@@ -202,7 +190,7 @@ class cubic : public path_segment {
     std::vector<linear> m_tri; 
 public:
     inline cubic(std::vector<R2> &points)
-        : path_segment(points) {
+        : path_segment(points[0], points[points.size()-1]) {
         assert(points.size() == 4);
         double x1, x2, x3;
         double y1, y2, y3;
@@ -276,9 +264,9 @@ public:
             v1 = make_R2(-x1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1), -y1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1));
         }
         //printf(": %.2f, %.2f\n", v1[0], v1[1]);
-        m_tri.push_back(linear(std::vector<R2>{v0+points[0], v1+points[0]}));
-        m_tri.push_back(linear(std::vector<R2>{v1+points[0], v2+points[0]}));
-        m_tri.push_back(linear(std::vector<R2>{v2+points[0], v0+points[0]}));
+        m_tri.push_back(linear(v0+points[0], v1+points[0]));
+        m_tri.push_back(linear(v1+points[0], v2+points[0]));
+        m_tri.push_back(linear(v2+points[0], v0+points[0]));
     }
     bool hit_inside_triangle(double x, double y) const {
         int sum = 0;
@@ -304,7 +292,8 @@ public:
     bool implicit_hit(double x, double y) const {
         x -= m_pi[0];
         y -= m_pi[1];
-        return (hit_triangle_left(x+m_pi[0], y+m_pi[1]) || (hit_inside_triangle(x+m_pi[0], y+m_pi[1]) && hit_me(x, y)));
+        return (hit_triangle_left(x+m_pi[0], y+m_pi[1]) ||
+               (hit_inside_triangle(x+m_pi[0], y+m_pi[1]) && hit_me(x, y)));
     }
 };
 
@@ -549,7 +538,7 @@ public:
     {};
     inline void do_linear_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1)};
-        m_path.push_back(new linear(points));
+        m_path.push_back(new linear(points[0], points[1]));
     };
     inline void do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1,rvgf x2, rvgf y2){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
@@ -557,7 +546,7 @@ public:
     }
     inline void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
-        m_path.push_back(new rational(points, w1));    
+        m_path.push_back(new quadratic(points, w1));    
     };
     inline void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3){
         std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3)};
