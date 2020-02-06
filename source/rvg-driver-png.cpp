@@ -38,6 +38,9 @@ namespace rvg {
     namespace driver {
         namespace png {
 
+bool on_bound(image<uint8_t, 4> &img, double x, double y) {
+    return (x >= 0 && x < img.get_width() && y >= 0 && y < img.get_height());
+}
 
 class path_segment;
 template <typename T> int sgn(T val) {
@@ -71,6 +74,14 @@ public:
     }
     inline bool hit_inside(const double x, const double y) const {
         return y >= m_p0.get_y() && y < m_p1.get_y() && x >= m_p0.get_x() && x < m_p1.get_x();
+    }
+    void debug(image<uint8_t, 4> &img, int r, int g, int b) {
+        if(on_bound(img, m_p0[0], m_p0[1])) {
+            img.set_pixel(m_p0[0], m_p0[1], r, g, b, 155);
+        }
+        if(on_bound(img, m_p1[0], m_p1[1])) {
+            img.set_pixel(m_p1[0], m_p1[1], r, g, b, 155);
+        }
     }
 };
 
@@ -107,6 +118,13 @@ public:
     }
     R2 last() const {
         return m_points[m_points.size()-1];
+    }
+    virtual void debug(image<uint8_t, 4> &img, int r, int g, int b) {
+        for(auto p : m_points) {
+            if(on_bound(img, p[0], p[1])) {
+                img.set_pixel(p[0], p[1], r, g, b, 100);
+            }
+        }
     }
 };
 
@@ -194,9 +212,6 @@ public:
     rational(std::vector<R2> &points, double w)
         : quadratic(points, w)
     {}
-    bool implicit_hit(double x, double y) const {
-        return quadratic::implicit_hit(x, y);
-    }
     void print() const {
         quadratic::print();
         printf("\t\tw:%.2f\n", m_w);
@@ -213,14 +228,11 @@ class cubic : public path_segment {
     long int G;
     long int H;
     long int I;
-    const linear m_diag; 
-    const bool m_cvx;
     int m_der;
+    std::vector<linear> m_tri; 
 public:
     inline cubic(std::vector<R2> &points)
-        : path_segment(points)
-        , m_diag(std::vector<R2>{make_R2(0, 0), points[3]-points[0]})
-        , m_cvx(m_diag.implicit_hit(points[1][0]-points[0][0], points[1][1]-points[0][1])) {
+        : path_segment(points) {
         assert(points.size() == 4);
         double x1, x2, x3;
         double y1, y2, y3;
@@ -274,19 +286,65 @@ public:
                     2*x2*(x3*(3*y1*y1 - y2*y3 + y1*(-6*y2 + y3)) + 
                     x1*(y1*(9*y2 - 3*y3) - y3*(6*y2 + y3))))
         );
+        R2 v0(0, 0);
+        R2 v1;
+        R2 v2(x3, y3);
+        if(std::abs(x1) < EPS && std::abs(y1) < EPS) {
+            // p0 = p1
+            // fazer triangulo com p0, p2, p3
+            v1 = make_R2(x2, y2);
+            printf("p0 = p1\n");
+        }
+        else if(std::abs(x3-x2) < EPS && std::abs(y3-y2) < EPS) {
+            // p3 = p2
+            // fazer triangulo com p0, p1, p3;
+            v1 = make_R2(x1, y1);
+            printf("p3 = p2\n");
+        }
+        else {
+            printf("n\n");
+            v1 = make_R2(-x1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1), -y1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1));
+        }
+        //printf(": %.2f, %.2f\n", v1[0], v1[1]);
+        m_tri.push_back(linear(std::vector<R2>{v0+points[0], v1+points[0]}));
+        m_tri.push_back(linear(std::vector<R2>{v1+points[0], v2+points[0]}));
+        m_tri.push_back(linear(std::vector<R2>{v2+points[0], v0+points[0]}));
+    }
+    bool hit_inside_triangle(double x, double y) const {
+        int sum = 0;
+        for(auto seg : m_tri) {
+            if(seg.implicit_hit(x, y)) {
+                sum++;
+            }
+        }
+        return sum == 1;
+    }
+    bool hit_triangle_left(double x, double y) const {
+        int sum = 0;
+        for(auto seg : m_tri) {
+            if(seg.implicit_hit(x, y)) {
+                sum++;
+            }
+        }
+        return sum == 2;
+    }
+    bool hit_me(double x, double y) const {
+        return (m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)))) <= 0;
     }
     bool implicit_hit(double x, double y) const {
         x -= m_points[0][0];
         y -= m_points[0][1];
-        return(m_cvx && (m_diag.implicit_hit(x, y) && hit_me(x, y)))
-           ||(!m_cvx && (m_diag.implicit_hit(x, y) || hit_me(x, y)));
+        return (hit_triangle_left(x+m_points[0][0], y+m_points[0][1]) || (hit_inside_triangle(x+m_points[0][0], y+m_points[0][1])));
     }
     inline void print() const {
         printf("\tquad: (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f), (%.2f,%.2f).\n", m_points[0][0], m_points[0][1], m_points[1][0], m_points[1][1], 
                                                                                 m_points[2][0], m_points[2][1], m_points[3][0], m_points[3][1]);
     }
-    bool hit_me(double x, double y) const {
-        return (m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)))) <= 0;
+    void debug(image<uint8_t, 4> &img, int r, int g, int b) {
+        path_segment::debug(img, r, g, b);
+        for(auto seg : m_tri) {
+            seg.debug(img, 0, 0, 255);
+        }
     }
 };
 
@@ -503,6 +561,12 @@ public:
             seg->print();
         }
     }
+    void debug(image<uint8_t, 4> &img) {
+        m_bbox.debug(img, 0, 255, 255);
+        for(auto seg : m_path) {
+            seg->debug(img, 0, 255, 0);
+        }
+    }
 };
 
 class accelerated {
@@ -526,6 +590,11 @@ public:
     inline void print() const {
         for(auto obj : objects) {
             obj->print();
+        }
+    }
+    void debug(image<uint8_t, 4> &img) {
+        for(auto obj : objects) {
+            obj->debug(img);
         }
     }
 };
@@ -677,6 +746,7 @@ void render(accelerated &a, const window &w, const viewport &v,
         }
     }
     std::cout <<("\n");
+    a.debug(out_image);
     store_png<uint8_t>(out, out_image);
     a.destroy();
 }
