@@ -557,7 +557,7 @@ driver/distroke.so: $(SO_DISTROKE_DRV_OBJ)
 
 driver/png.so: $(SO_PNG_DRV_OBJ)
 	mkdir -p driver
-	$(CXX) $(SOLDFLAGS) -o $@ $^ $(PNG_LIB) $(B64_LIB) $(LP_LIB) $(OMP_LIB)
+	$(CXX) -g $(SOLDFLAGS) -o $@ $^ $(PNG_LIB) $(B64_LIB) $(LP_LIB) $(OMP_LIB)
 
 driver/svg.so: $(SO_SVG_DRV_OBJ)
 	mkdir -p driver
