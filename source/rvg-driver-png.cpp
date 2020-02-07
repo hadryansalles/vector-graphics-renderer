@@ -39,16 +39,17 @@ namespace rvg {
         namespace png {
 
 class path_segment;
-template <typename T> int sgn(T val) {
+template <typename T> inline int sgn(T val) {
     return (T(0) < val) - (val < T(0));
 }
+
 
 class bouding_box {
 private:
     R2 m_p0;
     R2 m_p1;
 public:
-    bouding_box(const R2 &first, const R2 &last) {
+    inline bouding_box(const R2 &first, const R2 &last) {
         m_p0 = make_R2(std::min(first[0], last[0]), std::min(first[1], last[1]));
         m_p1 = make_R2(std::max(first[0], last[0]), std::max(first[1], last[1]));
     }
@@ -127,11 +128,11 @@ class linear : public path_segment {
 private:
     const R2 m_d;
 public:
-    linear(const R2 &p0, const R2 &p1)
+    inline linear(const R2 &p0, const R2 &p1)
         : path_segment(p0, p1)
         , m_d(p1-p0) 
     {}
-    bool implicit_hit(double x, double y) const {
+    inline bool implicit_hit(double x, double y) const {
         return (m_d[1]*((x - m_pi[0])*m_d[1] - (y - m_pi[1])*m_d[0]) <= 0);
     }
 };
@@ -148,12 +149,11 @@ protected:
     const double m_D;
     const double m_E;
     const int m_der;
-    const double m_w;
 public:
-    quadratic(std::vector<R2> &points, double w = 1.0) 
-        : path_segment(points[0], points[points.size()-1])
-        , m_p1(points[1]-points[0]*w)
-        , m_p2(points[2]-points[0])
+    quadratic(const R2 &p0, const R2 &p1, const R2& p2, double w = 1.0) 
+        : path_segment(p0, p2)
+        , m_p1(p1-(p0*w))
+        , m_p2(p2-p0)
         , m_diag(make_R2(0, 0), m_p2)
         , m_cvx(m_diag.implicit_hit(m_p1[0], m_p1[1]))
         , m_A(4.0*m_p1[0]*m_p1[0]-4.0*w*m_p1[0]*m_p2[0]+m_p2[0]*m_p2[0])
@@ -161,17 +161,16 @@ public:
         , m_C(-4.0*m_p2[0]*m_p1[1]*m_p1[1]+4*m_p1[0]*m_p1[1]*m_p2[1])
         , m_D(-8.0*m_p1[0]*m_p1[1]+4.0*w*m_p2[0]*m_p1[1]+4.0*w*m_p1[0]*m_p2[1]-2.0*m_p2[0]*m_p2[1])
         , m_E(4.0*m_p1[1]*m_p1[1]-4.0*w*m_p1[1]*m_p2[1]+m_p2[1]*m_p2[1]) 
-        , m_der(sgn(2*m_p2[1]*(-m_p2[0]*m_p1[1]+m_p1[0]*m_p2[1])))
-        , m_w(w) {
-        assert(points.size() == 3);
-    }
-    bool implicit_hit(double x, double y) const {
+        , m_der(sgn(2*m_p2[1]*(-m_p2[0]*m_p1[1]+m_p1[0]*m_p2[1]))) 
+    {}
+    inline bool implicit_hit(double x, double y) const {
         x -= m_pi[0];
         y -= m_pi[1];
-        return(m_cvx && (m_diag.implicit_hit(x, y) && hit_me(x, y)))
-           ||(!m_cvx && (m_diag.implicit_hit(x, y) || hit_me(x, y)));
+        bool diag_hit = m_diag.implicit_hit(x, y);
+        return(m_cvx && (diag_hit && hit_me(x, y)))
+           ||(!m_cvx && (diag_hit || hit_me(x, y)));
     }
-    bool hit_me(double x, double y) const {
+    inline bool hit_me(double x, double y) const {
         return m_der*sgn((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E))) <= 0;
     }
 };
@@ -189,17 +188,16 @@ class cubic : public path_segment {
     int m_der;
     std::vector<linear> m_tri; 
 public:
-    inline cubic(std::vector<R2> &points)
-        : path_segment(points[0], points[points.size()-1]) {
-        assert(points.size() == 4);
+    inline cubic(const R2 &p0, const R2 &p1, const R2 &p2, const R2 &p3)
+        : path_segment(p0, p3) {
         double x1, x2, x3;
         double y1, y2, y3;
-        x1 = (points[1] - points[0]).get_x();
-        y1 = (points[1] - points[0]).get_y();
-        x2 = (points[2] - points[0]).get_x();
-        y2 = (points[2] - points[0]).get_y();
-        x3 = (points[3] - points[0]).get_x();
-        y3 = (points[3] - points[0]).get_y();
+        x1 = (p1 - p0).get_x();
+        y1 = (p1 - p0).get_y();
+        x2 = (p2 - p0).get_x();
+        y2 = (p2 - p0).get_y();
+        x3 = (p3 - p0).get_x();
+        y3 = (p3 - p0).get_y();
         A = -27*x1*x3*x3*y1*y1 + 81*x1*x2*x3*y1*y2 - 81*x1*x1*x3*y2*y2 - 
              81*x1*x2*x2*y1*y3 + 54*x1*x1*x3*y1*y3 + 81*x1*x1*x2*y2*y3 - 
              27*x1*x1*x1*y3*y3;
@@ -248,52 +246,41 @@ public:
         R2 v1;
         R2 v2(x3, y3);
         if(std::abs(x1*x1) < EPS && std::abs(y1*y1) < EPS) {
-            // p0 = p1
-            // fazer triangulo com p0, p2, p3
             v1 = make_R2(x2, y2);
         }
         else if(std::abs(x3-x2)*std::abs(x3-x2) < EPS && std::abs(y3-y2)*std::abs(y3-y2) < EPS) {
-            // p3 = p2
-            // fazer triangulo com p0, p1, p3;
+            
             v1 = make_R2(x1, y1);
         }
         else if(std::abs(x2-x1)*std::abs(x2-x1) < EPS && std::abs(y2-y1)*std::abs(y2-y1) < EPS){
             v1 = make_R2(x2, y2);
         }
         else {
-            v1 = make_R2(-x1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1), -y1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1));
+            v1 = make_R2(-x1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1), 
+                         -y1*(x2*y3 - x3*y2)/(x1*y2 - x1*y3 - x2*y1 + x3*y1));
         }
-        //printf(": %.2f, %.2f\n", v1[0], v1[1]);
-        m_tri.push_back(linear(v0+points[0], v1+points[0]));
-        m_tri.push_back(linear(v1+points[0], v2+points[0]));
-        m_tri.push_back(linear(v2+points[0], v0+points[0]));
+        m_tri.push_back(linear(v0, v1));
+        m_tri.push_back(linear(v1, v2));
+        m_tri.push_back(linear(v2, v0));
     }
-    bool hit_inside_triangle(double x, double y) const {
-        int sum = 0;
-        for(auto seg : m_tri) {
-            if(seg.intersect(x, y)) {
-                sum += seg.get_dir();
-            }
-        }
-        return sum%2 != 0;
-    }
-    bool hit_triangle_left(double x, double y) const {
+    inline int triangle_hits(double x, double y) const {
         int sum = 0;
         for(auto seg : m_tri) {
             if(seg.intersect(x, y)) {
                 sum++;
             }
         }
-        return sum == 2;
+        return sum;
     }
-    bool hit_me(double x, double y) const {
+    inline bool hit_me(double x, double y) const {
         return (m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)))) <= 0;
     }
-    bool implicit_hit(double x, double y) const {
+    inline bool implicit_hit(double x, double y) const {
         x -= m_pi[0];
         y -= m_pi[1];
-        return (hit_triangle_left(x+m_pi[0], y+m_pi[1]) ||
-               (hit_inside_triangle(x+m_pi[0], y+m_pi[1]) && hit_me(x, y)));
+        int hits = triangle_hits(x, y);
+        return (hits == 2 || 
+               (hits == 1 && hit_me(x, y)));
     }
 };
 
@@ -320,6 +307,8 @@ class color_gradient_solver : public color_solver {
 protected:
     color_ramp m_ramp;
     const xform m_inv_xf;
+    std::vector<color_stop> m_stops;
+    unsigned int m_stops_size;
     double spread(double t) const {
         double rt = t;
         if(t < 0 || t > 1) {
@@ -348,30 +337,28 @@ protected:
     }
     virtual RGBA8 wrap(double t) const {
         RGBA8 color(0, 0, 0, 0);
-        std::vector<color_stop> stops = m_ramp.get_color_stops();
-        assert(stops.size() > 0);
-        if(t <= stops[0].get_offset()){
-            color = stops[0].get_color();
-        }
-        else if(t >= stops[stops.size()-1].get_offset()){
-            color = stops[stops.size()-1].get_color();
-        }
-        else{
-            assert(stops.size() > 1);
-            for(unsigned int i = 0, j = 1; j < stops.size(); i++, j++){
-                if(stops[j].get_offset() >= t){
-                    double amp = stops[j].get_offset() - stops[i].get_offset();
-                    t -= stops[i].get_offset();
-                    t /= amp;
-                    RGBA8 c1 = stops[i].get_color();
-                    RGBA8 c2 = stops[j].get_color();
-                    return make_rgba8(
-                        c1[0]*(1-t) + c2[0]*t,
-                        c1[1]*(1-t) + c2[1]*t,
-                        c1[2]*(1-t) + c2[2]*t,
-                        c1[3]*(1-t) + c2[3]*t 
-                    );
-                    break;
+        if(m_stops_size > 0) {
+            if(t <= m_stops[0].get_offset()){
+                color = m_stops[0].get_color();
+            }
+            else if(t >= m_stops[m_stops_size-1].get_offset()){
+                color = m_stops[m_stops_size-1].get_color();
+            }
+            else if(m_stops_size > 1) {
+                for(unsigned int i = 0, j = 1; j < m_stops_size; i++, j++){
+                    if(m_stops[j].get_offset() >= t){
+                        double amp = m_stops[j].get_offset() - m_stops[i].get_offset();
+                        t -= m_stops[i].get_offset();
+                        t /= amp;
+                        RGBA8 c1 = m_stops[i].get_color();
+                        RGBA8 c2 = m_stops[j].get_color();
+                        return make_rgba8(
+                            c1[0]*(1-t) + c2[0]*t,
+                            c1[1]*(1-t) + c2[1]*t,
+                            c1[2]*(1-t) + c2[2]*t,
+                            c1[3]*(1-t) + c2[3]*t 
+                        );
+                    }
                 }
             }
         }
@@ -382,8 +369,10 @@ public:
     color_gradient_solver(const paint &pat, const color_ramp &ramp) 
         : color_solver(pat)
         , m_ramp(ramp)
-        , m_inv_xf(m_paint.get_xf().inverse()) {
-    }
+        , m_inv_xf(m_paint.get_xf().inverse())
+        , m_stops(m_ramp.get_color_stops())
+        , m_stops_size(m_stops.size())
+    {}
     virtual ~color_gradient_solver()
     {}
     virtual RGBA8 solve(double x, double y) const {
@@ -402,8 +391,9 @@ private:
     const linear_gradient_data m_data;
     const R2 m_p1;
     const R2 m_p2_p1;
+    const double m_dot_p2_p1;
     double convert(R2 p) const {
-        return dot((p-m_p1), (m_p2_p1))/dot((m_p2_p1), (m_p2_p1));
+        return dot((p-m_p1), (m_p2_p1))/m_dot_p2_p1;
     }
 public:
     linear_gradient_solver(const paint& pat)
@@ -411,9 +401,9 @@ public:
         , m_data(m_paint.get_linear_gradient_data())
         , m_p1(m_data.get_x1(), m_data.get_y1())
         , m_p2_p1(m_data.get_x2()-m_data.get_x1(), m_data.get_y2()-m_data.get_y1()) 
+        , m_dot_p2_p1(dot(m_p2_p1, m_p2_p1))
     {}
 };
-
 
 class radial_gradient_solver : public color_gradient_solver {
 private:
@@ -541,16 +531,13 @@ public:
         m_path.push_back(new linear(points[0], points[1]));
     };
     inline void do_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1,rvgf x2, rvgf y2){
-        std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
-        m_path.push_back(new quadratic(points));
+        m_path.push_back(new quadratic(make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)));
     }
     inline void do_rational_quadratic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf w1, rvgf x2, rvgf y2){
-        std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2)};
-        m_path.push_back(new quadratic(points, w1));    
+        m_path.push_back(new quadratic(make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), w1));    
     };
     inline void do_cubic_segment(rvgf x0, rvgf y0, rvgf x1, rvgf y1, rvgf x2, rvgf y2, rvgf x3, rvgf y3){
-        std::vector<R2> points{make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3)};
-        m_path.push_back(new cubic(points));
+        m_path.push_back(new cubic(make_R2(x0, y0), make_R2(x1, y1), make_R2(x2, y2), make_R2(x3, y3)));
     };
     inline void do_begin_contour(rvgf x0, rvgf y0){
         m_last_move = make_R2(x0, y0);
@@ -640,8 +627,7 @@ RGBA8 sample(const accelerated& a, float x, float y){
     for(auto obj_it = a.objects.rbegin(); obj_it != a.objects.rend(); ++obj_it) {
         auto obj = (*obj_it);
         if(obj->hit(x, y)){
-            auto cop = pre_multiply(obj->get_color(x, y));
-            c = over(c, cop);
+            c = over(c, pre_multiply(obj->get_color(x, y)));
             if((int) c[3] == 255) {
                 return c;
             }
@@ -659,20 +645,17 @@ void render(accelerated &a, const window &w, const viewport &v,
     std::tie(xr, yt) = v.tr();
     int width = xr - xl;
     int height = yt - yb;
-
     image<uint8_t, 4> out_image;
     out_image.resize(width, height);
     RGBA8 s_color;
     for (int i = 1; i <= height; i++) {
         float y = yb+i-1.+.5f;
         for (int j = 1; j <= width; j++) {
-            printf("\r%.2f%%", 100*(double)(i*width+j)/(height*width));
             float x = xl+j-1+.5f;
             s_color  = sample(a, x, y);
             out_image.set_pixel(j-1, i-1, s_color[0], s_color[1], s_color[2], s_color[3]);
         }
     }
-    std::cout <<("\n");
     store_png<uint8_t>(out, out_image);
     a.destroy();
 }
