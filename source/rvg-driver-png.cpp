@@ -647,12 +647,12 @@ void render(accelerated &a, const window &w, const viewport &v,
     int height = yt - yb;
     image<uint8_t, 4> out_image;
     out_image.resize(width, height);
-    RGBA8 s_color;
+    #pragma omp parallel for
     for (int i = 1; i <= height; i++) {
         float y = yb+i-1.+.5f;
         for (int j = 1; j <= width; j++) {
             float x = xl+j-1+.5f;
-            s_color  = sample(a, x, y);
+            RGBA8 s_color = sample(a, x, y);
             out_image.set_pixel(j-1, i-1, s_color[0], s_color[1], s_color[2], s_color[3]);
         }
     }
