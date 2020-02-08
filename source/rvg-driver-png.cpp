@@ -26,10 +26,10 @@
 #include "rvg-input-path-f-close-contours.h"
 #include "rvg-input-path-f-downgrade-degenerate.h"
 
+#include "blue-noise.h"
+
 #include "rvg-i-scene-data.h"
-
 #include "rvg-lua-facade.h"
-
 #include "rvg-driver-png.h"
 
 #define EPS 0.00001
@@ -634,7 +634,6 @@ RGBA8 sample(const accelerated& a, float x, float y){
 
 void render(accelerated &a, const window &w, const viewport &v,
     FILE *out, const std::vector<std::string> &args) {
-    (void) args;
     (void) w;
     int xl, yb, xr, yt;
     std::tie(xl, yb) = v.bl();
@@ -643,77 +642,11 @@ void render(accelerated &a, const window &w, const viewport &v,
     int height = yt - yb;
     image<uint8_t, 4> out_image;
     out_image.resize(width, height);
-    std::vector<R2> blue_samples {  
-        make_R2(0.16914500, 0.03865330),
-        make_R2(-0.18599500, 0.12891000),
-        make_R2(-0.33949000, -0.07929130),
-        make_R2(0.46276000, 0.26089400),
-        make_R2(-0.14555200, -0.23657300),
-        make_R2(0.02382560, -0.40556900),
-        make_R2(-0.12388600, -0.37030500),
-        make_R2(-0.36297100, 0.17069000),
-        make_R2(-0.15521500, 0.42105700),
-        make_R2(0.12082400, -0.30798700),
-        make_R2(0.47381800, -0.18262100),
-        make_R2(0.05882570, 0.28990200),
-        make_R2(0.42593500, 0.04988550),
-        make_R2(0.18165400, -0.40046500),
-        make_R2(-0.23570100, -0.45028000),
-        make_R2(-0.06343560, -0.05378760),
-        make_R2(-0.30054000, 0.44889500),
-        make_R2(-0.47561100, -0.06744120),
-        make_R2(0.27591500, -0.30610000),
-        make_R2(0.30878300, 0.31793800),
-        make_R2(-0.43197600, 0.04322680),
-        make_R2(-0.46146900, -0.31194400),
-        make_R2(0.22082300, 0.48983600),
-        make_R2(0.36676800, 0.17863100),
-        make_R2(-0.07761080, 0.06874050),
-        make_R2(0.43883100, 0.36045500),
-        make_R2(-0.01210630, 0.17083500),
-        make_R2(-0.24254300, -0.31853300),
-        make_R2(-0.35023200, -0.34708800),
-        make_R2(0.08191250, 0.49015400),
-        make_R2(0.34700700, -0.18083700),
-        make_R2(0.24516200, -0.07076280),
-        make_R2(-0.39442700, -0.46397700),
-        make_R2(-0.40244700, 0.29623300),
-        make_R2(-0.20657100, -0.00285104),
-        make_R2(-0.06457980, 0.31579300),
-        make_R2(0.24474400, 0.17248800),
-        make_R2(0.32878800, 0.44304200),
-        make_R2(-0.02097480, -0.28866600),
-        make_R2(0.40715100, -0.30340300),
-        make_R2(-0.08692060, -0.47918800),
-        make_R2(-0.40150200, -0.19901100),
-        make_R2(0.04443170, 0.02485010),
-        make_R2(0.09260740, -0.19953500),
-        make_R2(-0.25475600, 0.34622000),
-        make_R2(-0.26848000, 0.23358400),
-        make_R2(-0.00398004, 0.41603200),
-        make_R2(-0.03452200, -0.16271600),
-        make_R2(0.38275600, -0.06430740),
-        make_R2(0.29766500, 0.05252960),
-        make_R2(0.15961100, 0.38493000),
-        make_R2(-0.14090000, 0.24279000),
-        make_R2(-0.28150000, -0.19772900),
-        make_R2(0.45914900, 0.47610600),
-        make_R2(-0.30685600, 0.05622170),
-        make_R2(-0.18739400, -0.11503200),
-        make_R2(0.21961000, -0.19201000),
-        make_R2(0.11079300, 0.15561900),
-        make_R2(-0.48974200, 0.15522800),
-        make_R2(0.18730100, 0.27639900),
-        make_R2(0.10202200, -0.08547970),
-        make_R2(0.33154300, -0.42511700),
-        make_R2(0.47246600, -0.41633300),
-        make_R2(-0.42490700, 0.40949100)
-    };
-
+    std::vector<R2> blue_samples(select_samples(args));
     #pragma omp parallel for
     for (int i = 1; i <= height; i++) {
         for (int j = 1; j <= width; j++) {
-            std::vector<int> color{0, 0, 0, 0};
+            std::vector<int> color{0, 0, 0, 255};
             for(auto sp : blue_samples) {
                 double y = yb+i-0.5+sp[0];
                 double x = xl+j-0.5+sp[1];
@@ -721,12 +654,10 @@ void render(accelerated &a, const window &w, const viewport &v,
                 color[0] += (int)sp_color[0];
                 color[1] += (int)sp_color[1];
                 color[2] += (int)sp_color[2];
-                color[3] += (int)sp_color[3];
             }
             color[0] /= blue_samples.size();
             color[1] /= blue_samples.size();
             color[2] /= blue_samples.size();
-            color[3] /= blue_samples.size();
             out_image.set_pixel(j-1, i-1, color[0], color[1], color[2], color[3]);
         }
     }
