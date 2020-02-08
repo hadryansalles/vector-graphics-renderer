@@ -36,6 +36,8 @@ heavy=("blue_butterfly"
        "contour"
        "hawaii"
        "roads"
+	"bunny_dense_flat"
+	"page_1"
        "inkboard")
 
 

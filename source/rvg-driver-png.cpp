@@ -39,9 +39,6 @@ namespace rvg {
         namespace png {
 
 class path_segment;
-template <typename T> inline int sgn(T val) {
-    return (T(0) < val) - (val < T(0));
-}
 
 class bouding_box {
 private:
@@ -160,7 +157,7 @@ public:
         , m_C(-4.0*m_p2[0]*m_p1[1]*m_p1[1]+4.0*m_p1[0]*m_p1[1]*m_p2[1])
         , m_D(-8.0*m_p1[0]*m_p1[1]+4.0*w*m_p2[0]*m_p1[1]+4.0*w*m_p1[0]*m_p2[1]-2.0*m_p2[0]*m_p2[1])
         , m_E(4.0*m_p1[1]*m_p1[1]-4.0*w*m_p1[1]*m_p2[1]+m_p2[1]*m_p2[1]) 
-        , m_der(sgn(2*m_p2[1]*(-m_p2[0]*m_p1[1]+m_p1[0]*m_p2[1]))) 
+        , m_der((2*m_p2[1]*(-m_p2[0]*m_p1[1]+m_p1[0]*m_p2[1]))) 
     {}
     inline bool implicit_hit(double x, double y) const {
         x -= m_pi[0];
@@ -170,21 +167,21 @@ public:
            ||(!m_cvx && (diag_hit || hit_me(x, y)));
     }
     inline bool hit_me(double x, double y) const {
-        return m_der*sgn((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E))) <= 0;
+        return m_der*((y*(y*m_A + m_B) + x*(m_C + y*m_D + x*m_E))) <= 0;
     }
 };
 
 class cubic : public path_segment {
-    long int A;
-    long int B;
-    long int C;
-    long int D;
-    long int E;
-    long int F;
-    long int G;
-    long int H;
-    long int I;
-    int m_der;
+    double A;
+    double B;
+    double C;
+    double D;
+    double E;
+    double F;
+    double G;
+    double H;
+    double I;
+    double m_der;
     std::vector<linear> m_tri; 
 public:
     inline cubic(const R2 &p0, const R2 &p1, const R2 &p2, const R2 &p3)
@@ -234,7 +231,7 @@ public:
             9.0*x2*y3*y3 - 3.0*x3*y3*y3;
         I = 27.0*y1*y1*y1 - 81.0*y1*y1*y2 + 81.0*y1*y2*y2 - 27.0*y2*y2*y2 + 27.0*y1*y1*y3 - 
             54.0*y1*y2*y3 + 27.0*y2*y2*y3 + 9.0*y1*y3*y3 - 9.0*y2*y3*y3 + y3*y3*y3;
-        m_der = sgn((y1 - y2 - y3)*(-x3*x3*(4.0*y1*y1 - 2.0*y1*y2 + y2*y2) + 
+        m_der = ((y1 - y2 - y3)*(-x3*x3*(4.0*y1*y1 - 2.0*y1*y2 + y2*y2) + 
                     x1*x1*(9.0*y2*y2 - 6.0*y2*y3 - 4.0*y3*y3) + 
                     x2*x2*(9.0*y1*y1 - 12*y1*y3 - y3*y3) + 
                     2*x1*x3*(-y2*(6.0*y2 + y3) + y1*(3.0*y2 + 4.0*y3)) - 
@@ -272,7 +269,7 @@ public:
         return sum;
     }
     inline bool hit_me(double x, double y) const {
-        return (m_der*sgn(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)))) <= 0;
+        return (m_der*(y*(A + y*(y*(B) + C)) + x*(D + y*(E + y*F) + x*(G + y*H + x*I)))) <= 0;
     }
     inline bool implicit_hit(double x, double y) const {
         x -= m_pi[0];
