@@ -650,7 +650,7 @@ void render(accelerated &a, const window &w, const viewport &v,
             for(auto sp : blue_samples) {
                 double y = yb+i-0.5+sp[0];
                 double x = xl+j-0.5+sp[1];
-                RGBA8 sp_color(sample(a, x, y));
+                RGBA8 sp_color(remove_gamma(sample(a, x, y)));
                 color[0] += (int)sp_color[0];
                 color[1] += (int)sp_color[1];
                 color[2] += (int)sp_color[2];
@@ -658,7 +658,8 @@ void render(accelerated &a, const window &w, const viewport &v,
             color[0] /= blue_samples.size();
             color[1] /= blue_samples.size();
             color[2] /= blue_samples.size();
-            out_image.set_pixel(j-1, i-1, color[0], color[1], color[2], color[3]);
+            RGBA8 g_color = add_gamma(make_rgba8(color[0], color[1], color[2], color[3]));
+            out_image.set_pixel(j-1, i-1, g_color[0], g_color[1], g_color[2], 255);
         }
     }
     store_png<uint8_t>(out, out_image);
