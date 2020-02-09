@@ -4,4 +4,7 @@ rational quadratic path,
 cubic path,
 transparency,
 linear gradient,
-radial gradient
+radial gradient,
+implicit tests,
+openmp parallel for,
+super sampling
