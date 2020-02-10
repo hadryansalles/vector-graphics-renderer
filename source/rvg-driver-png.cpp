@@ -283,32 +283,11 @@ public:
 class color_solver {
 protected:
     paint m_paint;
-public:
-    color_solver(const paint& pat)
-        : m_paint(pat)
-    {}
-    virtual ~color_solver()
-    {}
-    virtual RGBA8 solve(double x, double y) const {
-        (void) x;
-        (void) y;
-        RGBA8 color = m_paint.get_solid_color();
-        return make_rgba8(
-            color[0], color[1], color[2], color[3]*m_paint.get_opacity()
-        );
-    }
-};
-
-class color_gradient_solver : public color_solver {
-protected:
-    color_ramp m_ramp;
     const xform m_inv_xf;
-    std::vector<color_stop> m_stops;
-    unsigned int m_stops_size;
-    double spread(double t) const {
+    double spread(e_spread spread, double t) const {
         double rt = t;
         if(t < 0 || t > 1) {
-            switch(m_ramp.get_spread()){
+            switch(spread){
                 case e_spread::clamp:
                     rt = std::max(0.0, std::min(1.0, t));
                     break;
@@ -331,6 +310,28 @@ protected:
         }
         return rt;
     }
+public:
+    color_solver(const paint& pat)
+        : m_paint(pat)
+        , m_inv_xf(m_paint.get_xf().inverse())
+    {}
+    virtual ~color_solver()
+    {}
+    virtual RGBA8 solve(double x, double y) const {
+        (void) x;
+        (void) y;
+        RGBA8 color = m_paint.get_solid_color();
+        return make_rgba8(
+            color[0], color[1], color[2], color[3]*m_paint.get_opacity()
+        );
+    }
+};
+
+class color_gradient_solver : public color_solver {
+protected:
+    color_ramp m_ramp;
+    std::vector<color_stop> m_stops;
+    unsigned int m_stops_size;
     virtual RGBA8 wrap(double t) const {
         RGBA8 color(0, 0, 0, 0);
         if(m_stops_size > 0) {
@@ -365,7 +366,6 @@ public:
     color_gradient_solver(const paint &pat, const color_ramp &ramp) 
         : color_solver(pat)
         , m_ramp(ramp)
-        , m_inv_xf(m_paint.get_xf().inverse())
         , m_stops(m_ramp.get_color_stops())
         , m_stops_size(m_stops.size())
     {}
@@ -374,7 +374,7 @@ public:
     virtual RGBA8 solve(double x, double y) const {
         RGBA8 color(0, 0, 0, 0);
         R2 p(m_inv_xf.apply(make_R2(x, y)));
-        double t = spread(convert(p));
+        double t = spread(m_ramp.get_spread(), convert(p));
         if(t != -1) {
             color = wrap(t);
         }
@@ -436,6 +436,35 @@ public:
     }   
 };  
 
+class texture_solver : public color_solver {
+    const i_image::const_ptr m_image_ptr;
+    const e_spread m_spread;
+    const int m_w, m_h;
+public:
+    texture_solver(const paint &pat)
+        : color_solver(pat)
+        , m_image_ptr(pat.get_texture_data().get_image_ptr())
+        , m_spread(pat.get_texture_data().get_spread())
+        , m_w(m_image_ptr->get_width())
+        , m_h(m_image_ptr->get_height())
+    {}
+    RGBA8 solve(double x, double y) const {
+        RGBA8 color(0, 0, 0, 0);
+        R2 p(m_inv_xf.apply(make_R2(x, y)));
+        double s_x = spread(m_spread, p[0]);
+        double s_y = spread(m_spread, p[1]);
+        if(s_x != -1 && s_y != -1) {
+            s_x *= m_w;
+            s_y *= m_h;
+            int r = 255*m_image_ptr->get_unorm(s_x, s_y, 0);
+            int g = 255*m_image_ptr->get_unorm(s_x, s_y, 1);
+            int b = 255*m_image_ptr->get_unorm(s_x, s_y, 2);
+            color = make_rgba8(r, g, b, m_paint.get_opacity());
+        }
+        return color;
+    }
+};
+
 class scene_object {
 private:
     std::vector<path_segment*> m_path;
@@ -453,6 +482,8 @@ public:
             color = new linear_gradient_solver(paint_in);
         } else if(paint_in.is_radial_gradient()) {
             color = new radial_gradient_solver(paint_in);
+        } else if(paint_in.is_texture()) { 
+            color = new texture_solver(paint_in);
         } else {
             RGBA8 s_transparent(0, 0, 0, 0);
             unorm8 s_opacity(0);

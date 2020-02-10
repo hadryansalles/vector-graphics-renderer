@@ -30,7 +30,7 @@ rvg.scene = scene{
   fill(path{M,0.057,0.116,C,0.027,0.116,0,0.088,0,0.058,0,0.028,0.027,0,0.056,0,0.088,0,0.116,0.027,0.116,0.058,0.116,0.088,0.088,0.116,0.057,0.116,Z,}:scaled(7.9701):translated(444.385, 666.826),
     rgb8(0,0,0)),
   fill(path{M,0,0,L,1,0,1,1,0,1,Z,}:scaled(86.398, -86.398):translated(448.163, 753.264),
-    texture(spread.clamp, image.png.load(base64.decode[[
+    texture(spread.wrap, image.png.load(base64.decode[[
 iVBORw0KGgoAAAANSUhEUgAAAtwAAALcCAYAAADUqWdpAAAABGdBTUEAALGPC/xhBQAAAAFz
 UkdCAdnJLH8AAAAgY0hSTQAAeiYAAICEAAD6AAAAgOgAAHUwAADqYAAAOpgAABdwnLpRPAAA
 IABJREFUeJzsvduW5DiypveZASDdPTLr0L17t2ZGszR7buZOehI9iN5HzyI9gS70AFpr1tK1
