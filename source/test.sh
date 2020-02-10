@@ -31,13 +31,10 @@ heavy=("blue_butterfly"
        "anatomical_heart"
        "paris-30k"
        "blender_freestyle"
-       "relatorio"
        "colorado"
        "contour"
        "hawaii"
        "roads"
-	"bunny_dense_flat"
-	"page_1"
        "inkboard")
 
 
