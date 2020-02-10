@@ -5,6 +5,7 @@ cubic path,
 transparency,
 linear gradient,
 radial gradient,
+textures,
 implicit tests,
 openmp parallel for,
 super sampling
