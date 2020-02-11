@@ -664,7 +664,7 @@ RGBA8 sample(const accelerated& a, float x, float y){
 }
 
 void unpack_args(const std::vector<std::string> &args,
-std::vector<R2> &samples, double &tx, double &ty) {
+std::vector<R2> &samples, double &tx, double &ty, int &threads) {
     samples = blue_1;
     tx = 0;
     ty = 0;
@@ -688,6 +688,8 @@ std::vector<R2> &samples, double &tx, double &ty) {
             tx = std::stof(value);
         } else if(command == std::string{"-ty"}) {
             ty = std::stof(value);
+        } else if(command == std::string{"-j"}) {
+            threads = std::stoi(value);
         }
     }
 }
@@ -703,11 +705,11 @@ void render(accelerated &a, const window &w, const viewport &v,
     image<uint8_t, 4> out_image;
     out_image.resize(width, height);
     
+    int threads = 1;
     double tx = 0, ty = 0;
     std::vector<R2> blue_samples;
-    unpack_args(args, blue_samples, tx, ty);
-    
-    #pragma omp parallel for
+    unpack_args(args, blue_samples, tx, ty, threads);
+    #pragma omp parallel for num_threads(threads)
     for (int i = 1; i <= height; i++) {
         for (int j = 1; j <= width; j++) {
             std::vector<int> color{0, 0, 0, 255};
