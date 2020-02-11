@@ -9,3 +9,8 @@ textures,
 implicit tests,
 openmp parallel for,
 super sampling
+
+arguments:
+-pattern:<samples per pixel>
+-tx:<x translation>
+-ty:<y translation>
