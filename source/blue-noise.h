@@ -133,19 +133,3 @@ std::vector<rvg::R2> blue_64 {
     rvg::make_R2(0.47246600, -0.41633300),
     rvg::make_R2(-0.42490700, 0.40949100)
 };
-std::vector<rvg::R2> select_samples(const std::vector<std::string> &args) {
-    for (auto &arg : args) {
-        if(arg == std::string{"-samples:1"}) {
-            return blue_1;
-        } else if(arg == std::string{"-samples:8"}) {
-            return blue_8;
-        } else if(arg == std::string{"-samples:16"}) {
-            return blue_16;
-        } else if(arg == std::string{"-samples:32"}) {
-            return blue_32;
-        } else if(arg == std::string{"-samples:64"}) {
-            return blue_64;
-        } 
-    }
-    return blue_1;
-}

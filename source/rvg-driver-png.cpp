@@ -663,6 +663,35 @@ RGBA8 sample(const accelerated& a, float x, float y){
     return over(c, make_rgba8(255, 255, 255, 255));
 }
 
+void unpack_args(const std::vector<std::string> &args,
+std::vector<R2> &samples, double &tx, double &ty) {
+    samples = blue_1;
+    tx = 0;
+    ty = 0;
+    for (auto &arg : args) {
+        std::string delimiter = ":";
+        std::string command = arg.substr(0, arg.find(delimiter)); 
+        std::string value = arg.substr(arg.find(delimiter)+1, arg.length()); 
+        if(command == std::string{"-pattern"}) {
+            if(value == std::string{"1"}) {
+                samples = blue_1;
+            } else if(value == std::string{"8"}) {
+                samples = blue_8;
+            } else if(value == std::string{"16"}) {
+                samples = blue_16;
+            } else if(value == std::string{"32"}) {
+                samples = blue_32;
+            } else if(value == std::string{"64"}) {
+                samples = blue_64;
+            }
+        } else if(command == std::string{"-tx"}) {
+            tx = std::stof(value);
+        } else if(command == std::string{"-ty"}) {
+            ty = std::stof(value);
+        }
+    }
+}
+
 void render(accelerated &a, const window &w, const viewport &v,
     FILE *out, const std::vector<std::string> &args) {
     (void) w;
@@ -673,14 +702,18 @@ void render(accelerated &a, const window &w, const viewport &v,
     int height = yt - yb;
     image<uint8_t, 4> out_image;
     out_image.resize(width, height);
-    std::vector<R2> blue_samples(select_samples(args));
+    
+    double tx = 0, ty = 0;
+    std::vector<R2> blue_samples;
+    unpack_args(args, blue_samples, tx, ty);
+    
     #pragma omp parallel for
     for (int i = 1; i <= height; i++) {
         for (int j = 1; j <= width; j++) {
             std::vector<int> color{0, 0, 0, 255};
             for(auto sp : blue_samples) {
-                double y = yb+i-0.5+sp[0];
-                double x = xl+j-0.5+sp[1];
+                double y = yb+i-0.5+sp[0]-ty;
+                double x = xl+j-0.5+sp[1]-tx;
                 RGBA8 sp_color(remove_gamma(sample(a, x, y)));
                 color[0] += (int)sp_color[0];
                 color[1] += (int)sp_color[1];
