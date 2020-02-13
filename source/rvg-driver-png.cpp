@@ -109,7 +109,7 @@ bouding_box::bouding_box(std::vector<path_segment*> &path) {
     if(path.size() > 0) {
         m_p0 = path[0]->first();
         m_p1 = path[0]->last();
-        for(auto seg : path){
+        for(auto &seg : path){
             R2 f = seg->first();
             R2 l = seg->last();
             m_p0 = make_R2(std::min(m_p0[0], f[0]), std::min(m_p0[1], f[1]));
@@ -261,7 +261,7 @@ public:
     }
     inline int triangle_hits(double x, double y) const {
         int sum = 0;
-        for(auto seg : m_tri) {
+        for(auto &seg : m_tri) {
             if(seg.intersect(x, y)) {
                 sum++;
             }
@@ -495,7 +495,7 @@ public:
         m_path.clear();
     }
     inline void destroy() {
-        for(auto seg : m_path) {
+        for(auto &seg : m_path) {
             delete seg;
             seg = NULL;
         }
@@ -504,7 +504,7 @@ public:
     inline bool hit(const double x, const double y) const {
         if(m_bbox.hit_inside(x, y)) { 
             int sum = 0;
-            for(auto seg : m_path){
+            for(auto &seg : m_path){
                 if(seg->intersect(x, y)) {
                     sum += seg->get_dir();
                 }
@@ -532,7 +532,7 @@ public:
         objects.clear();
     }
     inline void destroy() { 
-        for(auto obj : objects) {
+        for(auto &obj : objects) {
             obj->destroy();
             delete obj;
             obj = NULL;
@@ -713,7 +713,7 @@ void render(accelerated &a, const window &w, const viewport &v,
     for (int i = 1; i <= height; i++) {
         for (int j = 1; j <= width; j++) {
             std::vector<int> color{0, 0, 0, 255};
-            for(auto sp : blue_samples) {
+            for(auto &sp : blue_samples) {
                 double y = yb+i-0.5+sp[0]-ty;
                 double x = xl+j-0.5+sp[1]-tx;
                 RGBA8 sp_color(remove_gamma(sample(a, x, y)));
