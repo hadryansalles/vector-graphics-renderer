@@ -46,12 +46,15 @@ class bouding_box {
 private:
     R2 m_p0;
     R2 m_p1;
-public:
+public: 
+    inline bouding_box()
+        : m_p0(0, 0)
+        , m_p1(0, 0)
+    {}
     inline bouding_box(const R2 &first, const R2 &last) {
         m_p0 = make_R2(std::min(first[0], last[0]), std::min(first[1], last[1]));
         m_p1 = make_R2(std::max(first[0], last[0]), std::max(first[1], last[1]));
     }
-    inline bouding_box(std::vector<path_segment*> &path);
     inline bool hit_up(const double x, const double y) const {
         (void) x;
         return y >= m_p1.get_y();
@@ -75,7 +78,6 @@ public:
 
 class path_segment {
 protected:
-
     const R2 m_pi;
     const R2 m_pf;
     const bouding_box m_bbox; // segment bouding box
@@ -83,7 +85,6 @@ protected:
 public:
     path_segment(const R2 &p0, const R2 &p1)
         : m_pi(p0)
-
         , m_pf(p1)
         , m_bbox(m_pi, m_pf) 
         , m_dir(1) { 
@@ -108,21 +109,6 @@ public:
         return m_pf;
     }
 };
-
-bouding_box::bouding_box(std::vector<path_segment*> &path) {
-    if(path.size() > 0) {
-        m_p0 = path[0]->first();
-        m_p1 = path[0]->last();
-        for(auto &seg : path){
-            R2 f = seg->first();
-            R2 l = seg->last();
-            m_p0 = make_R2(std::min(m_p0[0], f[0]), std::min(m_p0[1], f[1]));
-            m_p0 = make_R2(std::min(m_p0[0], l[0]), std::min(m_p0[1], l[1]));
-            m_p1 = make_R2(std::max(m_p1[0], f[0]), std::max(m_p1[1], f[1]));
-            m_p1 = make_R2(std::max(m_p1[0], l[0]), std::max(m_p1[1], l[1]));
-        }
-    }
-}
 
 class linear : public path_segment {
 private:
@@ -287,14 +273,24 @@ public:
 class scene_object {
 private:
     std::vector<path_segment*> m_path;
-    bouding_box m_bbox;
     e_winding_rule m_wrule;
+    bouding_box m_bbox;
     color_solver* color;
 public:
     inline scene_object(std::vector<path_segment*> &path, const e_winding_rule &wrule, const paint &paint_in) 
-        : m_bbox(path)
-        , m_wrule(wrule) {
+        : m_wrule(wrule) {
         m_path = path;
+        R2 bb0 = path[0]->first();
+        R2 bb1 = path[0]->last();
+        for(auto &seg : path){
+            R2 f = seg->first();
+            R2 l = seg->last();
+            bb0 = make_R2(std::min(bb0[0], f[0]), std::min(bb0[1], f[1]));
+            bb0 = make_R2(std::min(bb0[0], l[0]), std::min(bb0[1], l[1]));
+            bb1 = make_R2(std::max(bb1[0], f[0]), std::max(bb1[1], f[1]));
+            bb1 = make_R2(std::max(bb1[0], l[0]), std::max(bb1[1], l[1]));
+        }
+        m_bbox = bouding_box(bb0, bb1);
         if(paint_in.is_solid_color()) {
             color = new color_solver(paint_in);
         } else if(paint_in.is_linear_gradient()) {
@@ -310,15 +306,15 @@ public:
             color = new color_solver(s_paint);
         }
     }
+    scene_object(const scene_object &rhs) = delete;
+    scene_object& operator=(const scene_object &rhs) = delete;
     inline ~scene_object() {
-        m_path.clear();
-    }
-    inline void destroy() {
         for(auto &seg : m_path) {
             delete seg;
             seg = NULL;
         }
         delete color;
+        m_path.clear();
     }
     inline bool hit(const double x, const double y) const {
         if(m_bbox.hit_inside(x, y)) { 
@@ -369,7 +365,6 @@ public:
     }
     inline void destroy() { 
         for(auto &obj : objects) {
-            obj->destroy();
             delete obj;
             obj = NULL;
         }
@@ -419,7 +414,7 @@ public:
 class accelerated_builder final: public i_scene_data<accelerated_builder> {
 private:
     friend i_scene_data<accelerated_builder>;
-    accelerated acc;
+    accelerated &acc;
     std::vector<xform> m_xf_stack;
     inline void pop_xf(){
         if (m_xf_stack.size() > 0) {
@@ -444,7 +439,8 @@ private:
                            make_input_path_f_downgrade_degenerate(
                            make_input_path_f_monotonize(
                            path_builder)))));
-        acc.add(new scene_object(path_builder.get(), wr, p.transformed(top_xf())));
+        if(path_builder.get().size() > 0) 
+            acc.add(new scene_object(path_builder.get(), wr, p.transformed(top_xf())));
     }
     inline void do_begin_transform(uint16_t depth, const xform &xf){
         (void) depth;
@@ -468,8 +464,9 @@ private:
     inline void do_end_blur(uint16_t depth, float radius){(void) depth;(void) radius;};
 
 public:
-    inline accelerated_builder(const std::vector<std::string> &args, 
-        const xform &screen_xf) {
+    inline accelerated_builder(accelerated &acc_in, const std::vector<std::string> &args, 
+        const xform &screen_xf)
+        :   acc(acc_in) {
         unpack_args(args);
         push_xf(screen_xf);
     }
@@ -503,16 +500,14 @@ public:
         }
         push_xf(translation(tx, ty));
     }
-    inline accelerated get_acc() const{
-        return acc;
-    }
 };
 
 const accelerated accelerate(const scene &c, const window &w,
     const viewport &v, const std::vector<std::string> &args) {
-    accelerated_builder builder(args, make_windowviewport(w, v) * c.get_xf());
+    accelerated acc;
+    accelerated_builder builder(acc, args, make_windowviewport(w, v) * c.get_xf());
     c.get_scene_data().iterate(builder);
-    return builder.get_acc();
+    return acc;
 }
 
 RGBA8 sample(const accelerated& a, float x, float y){
