@@ -278,6 +278,7 @@ DRV_OBJ := rvg-lua-base64.o \
 	rvg-lua-paint.o \
 	rvg-lua-scene.o \
 	rvg-lua.o \
+	hadryan-color.o \
 	strokers/rvg-stroker-rvg.o
 
 SO_STROKERS_OBJ := strokers/rvg-lua-strokers.o $(DRV_OBJ) $(ST_OBJ)

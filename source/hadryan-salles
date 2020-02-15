@@ -201,7 +201,7 @@ rvg-lua-texture-data.o: INC += $(LUA_INC)
 rvg-lua-paint.o: INC += $(LUA_INC)
 rvg-lua-scene.o: INC += $(LUA_INC)
 rvg-xform-svd.o: INC += $(LP_INC)
-
+hadryan-color.o: INC += $(LUA_INC)
 rvg-lua-chronos.o: INC += $(LUA_INC)
 rvg-lua-util.o: INC += $(LUA_INC)
 ifeq ($(vg_build_gperftools),yes)
@@ -651,6 +651,7 @@ DIST_CPP_SRC := \
 	rvg-decorated-path-f-thicken.h \
 	rvg-driver-cairo.cpp \
 	rvg-driver-cairo.h \
+	hadryan-color.cpp \
 	rvg-driver-png.cpp \
 	rvg-driver-png.h \
 	rvg-driver-eps.cpp \

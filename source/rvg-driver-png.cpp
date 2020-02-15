@@ -27,9 +27,11 @@
 #include "rvg-input-path-f-downgrade-degenerate.h"
 
 #include "blue-noise.h"
+#include "hadryan-color.cpp"
 
 #include "rvg-i-scene-data.h"
 #include "rvg-lua-facade.h"
+
 #include "rvg-driver-png.h"
 
 #define EPS 0.00001
@@ -73,6 +75,7 @@ public:
 
 class path_segment {
 protected:
+
     const R2 m_pi;
     const R2 m_pf;
     const bouding_box m_bbox; // segment bouding box
@@ -80,6 +83,7 @@ protected:
 public:
     path_segment(const R2 &p0, const R2 &p1)
         : m_pi(p0)
+
         , m_pf(p1)
         , m_bbox(m_pi, m_pf) 
         , m_dir(1) { 
@@ -280,191 +284,6 @@ public:
     }
 };
 
-class color_solver {
-protected:
-    paint m_paint;
-    const xform m_inv_xf;
-    double spread(e_spread spread, double t) const {
-        double rt = t;
-        if(t < 0 || t > 1) {
-            switch(spread){
-                case e_spread::clamp:
-                    rt = std::max(0.0, std::min(1.0, t));
-                    break;
-                case e_spread::wrap:
-                    rt = t - std::floor(t);
-                    break;
-                case e_spread::mirror:
-                    rt =  t - std::floor(t);
-                    if((int)rt%2 == 0){
-                        rt = 1 - rt;
-                    }
-                    break;
-                case e_spread::transparent:
-                    rt = -1;
-                    break;
-                default:
-                    rt = -1;
-                    break;
-            }
-        }
-        return rt;
-    }
-public:
-    color_solver(const paint& pat)
-        : m_paint(pat)
-        , m_inv_xf(m_paint.get_xf().inverse())
-    {}
-    virtual ~color_solver()
-    {}
-    virtual RGBA8 solve(double x, double y) const {
-        (void) x;
-        (void) y;
-        RGBA8 color = m_paint.get_solid_color();
-        return make_rgba8(
-            color[0], color[1], color[2], color[3]*m_paint.get_opacity()
-        );
-    }
-};
-
-class color_gradient_solver : public color_solver {
-protected:
-    color_ramp m_ramp;
-    std::vector<color_stop> m_stops;
-    unsigned int m_stops_size;
-    virtual RGBA8 wrap(double t) const {
-        RGBA8 color(0, 0, 0, 0);
-        if(m_stops_size > 0) {
-            if(t <= m_stops[0].get_offset()){
-                color = m_stops[0].get_color();
-            }
-            else if(t >= m_stops[m_stops_size-1].get_offset()){
-                color = m_stops[m_stops_size-1].get_color();
-            }
-            else if(m_stops_size > 1) {
-                for(unsigned int i = 0, j = 1; j < m_stops_size; i++, j++){
-                    if(m_stops[j].get_offset() >= t){
-                        double amp = m_stops[j].get_offset() - m_stops[i].get_offset();
-                        t -= m_stops[i].get_offset();
-                        t /= amp;
-                        RGBA8 c1 = m_stops[i].get_color();
-                        RGBA8 c2 = m_stops[j].get_color();
-                        return make_rgba8(
-                            c1[0]*(1-t) + c2[0]*t,
-                            c1[1]*(1-t) + c2[1]*t,
-                            c1[2]*(1-t) + c2[2]*t,
-                            c1[3]*(1-t) + c2[3]*t 
-                        );
-                    }
-                }
-            }
-        }
-        return color;
-    }
-    virtual double convert(R2 p) const = 0;
-public:
-    color_gradient_solver(const paint &pat, const color_ramp &ramp) 
-        : color_solver(pat)
-        , m_ramp(ramp)
-        , m_stops(m_ramp.get_color_stops())
-        , m_stops_size(m_stops.size())
-    {}
-    virtual ~color_gradient_solver()
-    {}
-    virtual RGBA8 solve(double x, double y) const {
-        RGBA8 color(0, 0, 0, 0);
-        R2 p(m_inv_xf.apply(make_R2(x, y)));
-        double t = spread(m_ramp.get_spread(), convert(p));
-        if(t != -1) {
-            color = wrap(t);
-        }
-        return make_rgba8(color[0], color[1], color[2], color[3]*m_paint.get_opacity());
-    }
-};
-
-class linear_gradient_solver : public color_gradient_solver {
-private:
-    const linear_gradient_data m_data;
-    const R2 m_p1;
-    const R2 m_p2_p1;
-    const double m_dot_p2_p1;
-    double convert(R2 p) const {
-        return dot((p-m_p1), (m_p2_p1))/m_dot_p2_p1;
-    }
-public:
-    linear_gradient_solver(const paint& pat)
-        : color_gradient_solver(pat, pat.get_linear_gradient_data().get_color_ramp())
-        , m_data(m_paint.get_linear_gradient_data())
-        , m_p1(m_data.get_x1(), m_data.get_y1())
-        , m_p2_p1(m_data.get_x2()-m_data.get_x1(), m_data.get_y2()-m_data.get_y1()) 
-        , m_dot_p2_p1(dot(m_p2_p1, m_p2_p1))
-    {}
-};
-
-class radial_gradient_solver : public color_gradient_solver {
-private:
-    const radial_gradient_data m_data;
-    xform  m_xf;
-    double m_B;
-    double m_C;
-    double convert(R2 p_in) const {
-        R2 p(m_xf.apply(p_in));
-        double A = p[0]*p[0] + p[1]*p[1];
-        double B = p[0]*m_B;
-        double det = B*B - A*m_C;
-        assert(det >= 0);
-        det = std::sqrt(det);
-        assert(std::abs(-B + det) > 0);
-        return A/(-B + det);
-    }
-       
-public:
-    radial_gradient_solver(const paint& pat)
-        : color_gradient_solver(pat, pat.get_radial_gradient_data().get_color_ramp())
-        , m_data(pat.get_radial_gradient_data()) {
-        m_xf = identity().translated(-m_data.get_cx(), -m_data.get_cy()).scaled(1/m_data.get_r());
-        R2 f = R2(m_xf.apply(make_R2(m_data.get_fx(), m_data.get_fy())));
-        double mod_f = std::sqrt(f[0]*f[0] + f[1]*f[1]);
-        if(mod_f > 1.0f) { // if focus transformed is in circle boudary
-            mod_f = 1.0f - EPS;
-        }
-        if(mod_f > EPS) { // if focus transformed isn't on origin
-            m_xf = m_xf.rotated(-f[0]/mod_f, f[1]/mod_f).translated(mod_f, 0);
-        }
-        m_B = -mod_f;
-        m_C = mod_f*mod_f - 1;
-    }   
-};  
-
-class texture_solver : public color_solver {
-    const i_image::const_ptr m_image_ptr;
-    const e_spread m_spread;
-    const int m_w, m_h;
-public:
-    texture_solver(const paint &pat)
-        : color_solver(pat)
-        , m_image_ptr(pat.get_texture_data().get_image_ptr())
-        , m_spread(pat.get_texture_data().get_spread())
-        , m_w(m_image_ptr->get_width())
-        , m_h(m_image_ptr->get_height())
-    {}
-    RGBA8 solve(double x, double y) const {
-        RGBA8 color(0, 0, 0, 0);
-        R2 p(m_inv_xf.apply(make_R2(x, y)));
-        double s_x = spread(m_spread, p[0]);
-        double s_y = spread(m_spread, p[1]);
-        if(s_x != -1 && s_y != -1) {
-            s_x *= m_w;
-            s_y *= m_h;
-            int r = 255*m_image_ptr->get_unorm(s_x, s_y, 0);
-            int g = 255*m_image_ptr->get_unorm(s_x, s_y, 1);
-            int b = 255*m_image_ptr->get_unorm(s_x, s_y, 2);
-            color = make_rgba8(r, g, b, m_paint.get_opacity());
-        }
-        return color;
-    }
-};
-
 class scene_object {
 private:
     std::vector<path_segment*> m_path;
@@ -526,8 +345,25 @@ public:
 class accelerated {
 public:
     std::vector<scene_object*> objects;
+    std::vector<R2> samples;
+    int threads;
     inline accelerated()
+        : samples{make_R2(0, 0)}
+        , threads(1)
     {}
+    inline accelerated(const accelerated& acc)
+        : objects(acc.objects)
+        , samples(acc.samples)
+        , threads(acc.threads)
+    {}
+    accelerated& operator=(const accelerated& acc) {
+        objects.clear();
+        samples.clear();
+        objects = acc.objects;
+        samples = acc.samples;
+        threads = acc.threads;
+        return (*this);
+    }
     inline ~accelerated() {
         objects.clear();
     }
@@ -580,20 +416,18 @@ public:
         return m_path;
     }
 };
-
 class accelerated_builder final: public i_scene_data<accelerated_builder> {
 private:
     friend i_scene_data<accelerated_builder>;
     accelerated acc;
     std::vector<xform> m_xf_stack;
-    
-    inline void push_xf(const xform &xf){
-        m_xf_stack.push_back(top_xf() * xf);
-    }
     inline void pop_xf(){
         if (m_xf_stack.size() > 0) {
             m_xf_stack.pop_back();
         }
+    }
+    inline void push_xf(const xform &xf){
+        m_xf_stack.push_back(top_xf() * xf);
     }
     inline const xform &top_xf() const{
         static xform id;
@@ -634,17 +468,49 @@ private:
     inline void do_end_blur(uint16_t depth, float radius){(void) depth;(void) radius;};
 
 public:
-    inline accelerated_builder(const xform &screen_xf){
+    inline accelerated_builder(const std::vector<std::string> &args, 
+        const xform &screen_xf) {
+        unpack_args(args);
         push_xf(screen_xf);
-    };
+    }
+    inline void unpack_args(const std::vector<std::string> &args) {
+        acc.samples = blue_1;
+        double tx = 0;
+        double ty = 0;
+        for (auto &arg : args) {
+            std::string delimiter = ":";
+            std::string command = arg.substr(0, arg.find(delimiter)); 
+            std::string value = arg.substr(arg.find(delimiter)+1, arg.length()); 
+            if(command == std::string{"-pattern"}) {
+                if(value == std::string{"1"}) {
+                    acc.samples = blue_1;
+                } else if(value == std::string{"8"}) {
+                    acc.samples = blue_8;
+                } else if(value == std::string{"16"}) {
+                    acc.samples = blue_16;
+                } else if(value == std::string{"32"}) {
+                    acc.samples = blue_32;
+                } else if(value == std::string{"64"}) {
+                    acc.samples = blue_64;
+                }
+            } else if(command == std::string{"-tx"}) {
+                tx = std::stof(value);
+            } else if(command == std::string{"-ty"}) {
+                ty = std::stof(value);
+            } else if(command == std::string{"-j"}) {
+                acc.threads = std::stoi(value);
+            }
+        }
+        push_xf(translation(tx, ty));
+    }
     inline accelerated get_acc() const{
         return acc;
-    };
+    }
 };
 
 const accelerated accelerate(const scene &c, const window &w,
-    const viewport &v) {
-    accelerated_builder builder(make_windowviewport(w, v) * c.get_xf());
+    const viewport &v, const std::vector<std::string> &args) {
+    accelerated_builder builder(args, make_windowviewport(w, v) * c.get_xf());
     c.get_scene_data().iterate(builder);
     return builder.get_acc();
 }
@@ -663,39 +529,9 @@ RGBA8 sample(const accelerated& a, float x, float y){
     return over(c, make_rgba8(255, 255, 255, 255));
 }
 
-void unpack_args(const std::vector<std::string> &args,
-std::vector<R2> &samples, double &tx, double &ty, int &threads) {
-    samples = blue_1;
-    tx = 0;
-    ty = 0;
-    for (auto &arg : args) {
-        std::string delimiter = ":";
-        std::string command = arg.substr(0, arg.find(delimiter)); 
-        std::string value = arg.substr(arg.find(delimiter)+1, arg.length()); 
-        if(command == std::string{"-pattern"}) {
-            if(value == std::string{"1"}) {
-                samples = blue_1;
-            } else if(value == std::string{"8"}) {
-                samples = blue_8;
-            } else if(value == std::string{"16"}) {
-                samples = blue_16;
-            } else if(value == std::string{"32"}) {
-                samples = blue_32;
-            } else if(value == std::string{"64"}) {
-                samples = blue_64;
-            }
-        } else if(command == std::string{"-tx"}) {
-            tx = std::stof(value);
-        } else if(command == std::string{"-ty"}) {
-            ty = std::stof(value);
-        } else if(command == std::string{"-j"}) {
-            threads = std::stoi(value);
-        }
-    }
-}
-
 void render(accelerated &a, const window &w, const viewport &v,
     FILE *out, const std::vector<std::string> &args) {
+    (void) args;
     (void) w;
     int xl, yb, xr, yt;
     std::tie(xl, yb) = v.bl();
@@ -704,26 +540,21 @@ void render(accelerated &a, const window &w, const viewport &v,
     int height = yt - yb;
     image<uint8_t, 4> out_image;
     out_image.resize(width, height);
-    
-    int threads = 1;
-    double tx = 0, ty = 0;
-    std::vector<R2> blue_samples;
-    unpack_args(args, blue_samples, tx, ty, threads);
-    #pragma omp parallel for num_threads(threads)
+    #pragma omp parallel for num_threads(a.threads)
     for (int i = 1; i <= height; i++) {
         for (int j = 1; j <= width; j++) {
             std::vector<int> color{0, 0, 0, 255};
-            for(auto &sp : blue_samples) {
-                double y = yb+i-0.5+sp[0]-ty;
-                double x = xl+j-0.5+sp[1]-tx;
+            for(auto &sp : a.samples) {
+                double y = yb+i-0.5+sp[0];
+                double x = xl+j-0.5+sp[1];
                 RGBA8 sp_color(remove_gamma(sample(a, x, y)));
                 color[0] += (int)sp_color[0];
                 color[1] += (int)sp_color[1];
                 color[2] += (int)sp_color[2];
             }
-            color[0] /= blue_samples.size();
-            color[1] /= blue_samples.size();
-            color[2] /= blue_samples.size();
+            color[0] /= a.samples.size();
+            color[1] /= a.samples.size();
+            color[2] /= a.samples.size();
             RGBA8 g_color = add_gamma(make_rgba8(color[0], color[1], color[2], color[3]));
             out_image.set_pixel(j-1, i-1, g_color[0], g_color[1], g_color[2], 255);
         }
@@ -742,7 +573,8 @@ static int luaaccelerate(lua_State *L) {
         rvg::driver::png::accelerate(
             rvg_lua_check<rvg::scene>(L, 1),
             rvg_lua_check<rvg::window>(L, 2),
-            rvg_lua_check<rvg::viewport>(L, 3)));
+            rvg_lua_check<rvg::viewport>(L, 3),
+            rvg_lua_optargs(L, 4)));
     return 1;
 }
 
