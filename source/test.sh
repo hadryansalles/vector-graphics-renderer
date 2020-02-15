@@ -53,7 +53,7 @@ do
     output=$outputs$filename".png" 
     if [[ $only_quad =~ 0 ]] || [[ "${quad[@]}" =~ "${filename}" ]]; then
         if [[ ! " ${heavy[@]} " =~ " ${filename} " ]]; then
-            $lua $program $driver $input $output $1
+            $lua $program $driver $input $output $@
         fi
     fi
 done

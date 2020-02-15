@@ -163,21 +163,79 @@ public:
 
 class leave_node;
 class tree_node {
+protected:
+    static int depth;
+    static int max_depth;
     const double m_w;
     const double m_h;
     const bouding_box m_bbox;
     const R2 m_pc;
+    const R2 m_p0;
+    const R2 m_p1;
 public:
     tree_node(const R2 &p0, const R2 &p1) 
         : m_w(p1[0]-p0[0])
         , m_h(p1[1]-p0[1])
         , m_bbox(p0, p1)
-        , m_pc(p0+(make_R2(m_w, m_h)/2.0))
+        , m_pc(p0+(make_R2(m_w, m_h)/2.0)) 
+        , m_p0(p0)
+        , m_p1(p1) {
+        assert(p0[0] <= p1[0] && p0[1] < p1[1]);
+    }
+    virtual ~tree_node()
     {}
     bool intersect(const scene_object* obj) const{
         return m_bbox.intersect(obj->m_bbox);
     }
     virtual const leave_node* get_node_of(const double &x, const double &y) const = 0;
+    virtual void destroy() 
+    {}
+    static void set_max_depth(int max_) {
+        max_depth = max_;
+    } 
+};
+int tree_node::depth = 0;
+int tree_node::max_depth = 2;
+
+class intern_node : public tree_node {
+    tree_node* m_tr;
+    tree_node* m_tl;
+    tree_node* m_bl;
+    tree_node* m_br;
+public:
+    intern_node(const R2 &p0, const R2 &p1, tree_node* tr,
+                tree_node* tl, tree_node* bl, tree_node* br)
+        : tree_node(p0, p1)
+        , m_tr(tr)
+        , m_tl(tl)
+        , m_bl(bl)
+        , m_br(br) 
+    {}
+    virtual void destroy() {
+        m_tr->destroy();
+        m_tl->destroy();
+        m_bl->destroy();
+        m_br->destroy();
+    }
+    const leave_node* get_node_of(const double &x, const double &y) const {
+        if(!(x >= m_p0[0] && x < m_p1[0]
+          && y >= m_p0[1] && y < m_p1[1])) {
+            return nullptr;
+        }
+        if(x >= m_p0[0] && x < m_pc[0]) { // left side
+            if(y >= m_p0[1] && y < m_pc[1]) { // bottom side
+                return m_bl->get_node_of(x, y); 
+            } else { // top side
+                return m_tl->get_node_of(x, y);
+            }
+        } else { // right side
+            if(y >= m_p0[1] && y < m_pc[1]) { // bottom side
+                return m_br->get_node_of(x, y);
+            } else { // top side
+                return m_tr->get_node_of(x, y);
+            }
+        }
+    }
 };
 
 class leave_node : public tree_node {
@@ -197,6 +255,32 @@ public:
     const std::vector<node_object>& get_objects() const {
         return m_objects;
     }
+    tree_node* subdivide() {
+        if(depth >= max_depth) {
+            return this;
+        }
+        auto tr = new leave_node(m_pc, m_p1);
+        auto tl = new leave_node(make_R2(m_p0[0],m_pc[1]), make_R2(m_pc[0],m_p1[1]));
+        auto bl = new leave_node(m_p0, m_pc);
+        auto br = new leave_node(make_R2(m_pc[0],m_p0[1]), make_R2(m_p1[0],m_pc[1]));
+        for(auto &nobj : m_objects) {
+            if(tr->intersect(nobj.m_ptr)) {
+                tr->add_node_object(nobj);
+            }
+            if(tl->intersect(nobj.m_ptr)) {
+                tl->add_node_object(nobj);
+            }
+            if(bl->intersect(nobj.m_ptr)) {
+                bl->add_node_object(nobj);
+            }
+            if(br->intersect(nobj.m_ptr)) {
+                br->add_node_object(nobj);
+            }
+        }
+        depth++;
+        return new intern_node(m_p0, m_p1, tr->subdivide(), tl->subdivide(),
+                                           bl->subdivide(), br->subdivide());
+    }
 };
 
 class accelerated {
@@ -214,6 +298,8 @@ public:
             delete obj;
             obj = NULL;
         }
+        root->destroy();
+        delete root;
     }
     inline void add(scene_object* obj){
         objects.push_back(obj);
@@ -289,8 +375,9 @@ private:
                            make_input_path_f_downgrade_degenerate(
                            make_input_path_f_monotonize(
                            path_builder)))));
-        if(path_builder.get().size() > 0) 
+        if(path_builder.get().size() > 0) {
             acc.add(new scene_object(path_builder.get(), wr, p.transformed(top_xf())));
+        } 
     }
     inline void do_begin_transform(uint16_t depth, const xform &xf){
         (void) depth;
@@ -346,6 +433,8 @@ public:
                 ty = std::stof(value);
             } else if(command == std::string{"-j"}) {
                 acc.threads = std::stoi(value);
+            } else if(command == std::string{"-depth"}) {
+                tree_node::set_max_depth(std::stoi(value));
             }
         }
         push_xf(translation(tx, ty));
@@ -369,18 +458,20 @@ const accelerated accelerate(const scene &c, const window &w,
             first_leave->add_node_object(node_obj);
         }
     }
-    acc.root = first_leave;
+    acc.root = first_leave->subdivide();
     return acc;
 }
 
 RGBA8 sample(const accelerated& a, float x, float y){
     RGBA8 c = make_rgba8(0, 0, 0, 0);
     auto nod = a.root->get_node_of(x, y);
-    for(auto &nobj : nod->get_objects()) {
-        if(nobj.hit(x, y)) {
-            c = over(c, pre_multiply(nobj.get_color(x, y)));
-            if((int) c[3] == 255) {
-                return c;
+    if(nod != nullptr) {
+        for(auto &nobj : nod->get_objects()) {
+            if(nobj.hit(x, y)) {
+                c = over(c, pre_multiply(nobj.get_color(x, y)));
+                if((int) c[3] == 255) {
+                    return c;
+                }
             }
         }
     }
