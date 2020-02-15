@@ -44,10 +44,11 @@ namespace rvg {
 class scene_object {
 private:
     e_winding_rule m_wrule;
-    bouding_box m_bbox;
     color_solver* color;
 public:
     std::vector<path_segment*> m_path;
+    bouding_box m_bbox;
+public:
     inline scene_object(std::vector<path_segment*> &path, const e_winding_rule &wrule, const paint &paint_in) 
         : m_wrule(wrule) {
         m_path = path;
@@ -87,26 +88,23 @@ public:
         delete color;
         m_path.clear();
     }
-    inline bool hit(const double x, const double y) const {
-        if(m_bbox.hit_inside(x, y)) { 
-            int sum = 0;
-            for(auto seg : m_path){
-                if(seg->intersect(x, y)) {
-                    sum += seg->get_dir();
-                }
-            }
-            if(m_wrule == e_winding_rule::non_zero){
-                return (sum != 0);
-            }
-            else if(m_wrule == e_winding_rule::odd){
-                return ((sum % 2)!= 0);
-            }
-        }
-        return false;
-    }
-    inline bool hit_inside(const double x, const double y) const {
-        return m_bbox.hit_inside(x, y);
-    }
+    // inline bool hit(const double x, const double y) const {
+    //     if(m_bbox.hit_inside(x, y)) { 
+    //         int sum = 0;
+    //         for(auto seg : m_path){
+    //             if(seg->intersect(x, y)) {
+    //                 sum += seg->get_dir();
+    //             }
+    //         }
+    //         if(m_wrule == e_winding_rule::non_zero){
+    //             return (sum != 0);
+    //         }
+    //         else if(m_wrule == e_winding_rule::odd){
+    //             return ((sum % 2)!= 0);
+    //         }
+    //     }
+    //     return false;
+    // }
     inline bool satisfy_wrule(int winding) const {
         if(m_wrule == e_winding_rule::non_zero){
             return (winding != 0);
@@ -142,7 +140,7 @@ public:
         }
     }
     inline bool hit(const double x, const double y) const {
-        if(m_ptr->hit_inside(x, y)) { 
+        if(m_ptr->m_bbox.hit_inside(x, y)) { 
             int sum = 0;
             for(auto &seg : m_segments){
                 if(seg->intersect(x, y)) {
@@ -163,10 +161,48 @@ public:
     }
 };
 
+class leave_node;
+class tree_node {
+    const double m_w;
+    const double m_h;
+    const bouding_box m_bbox;
+    const R2 m_pc;
+public:
+    tree_node(const R2 &p0, const R2 &p1) 
+        : m_w(p1[0]-p0[0])
+        , m_h(p1[1]-p0[1])
+        , m_bbox(p0, p1)
+        , m_pc(p0+(make_R2(m_w, m_h)/2.0))
+    {}
+    bool intersect(const scene_object* obj) const{
+        return m_bbox.intersect(obj->m_bbox);
+    }
+    virtual const leave_node* get_node_of(const double &x, const double &y) const = 0;
+};
+
+class leave_node : public tree_node {
+    std::vector<node_object> m_objects;
+public:
+    leave_node(const R2 &p0, const R2 &p1)
+        : tree_node(p0, p1)
+    {}
+    const leave_node* get_node_of(const double &x, const double &y) const {
+        (void) x;
+        (void) y;
+        return this;
+    }
+    void add_node_object(const node_object &node_obj) {
+        m_objects.push_back(node_obj);
+    }
+    const std::vector<node_object>& get_objects() const {
+        return m_objects;
+    }
+};
+
 class accelerated {
 public:
     std::vector<scene_object*> objects;
-    std::vector<node_object> nodes;
+    tree_node* root = nullptr;
     std::vector<R2> samples;
     int threads;
     inline accelerated()
@@ -181,15 +217,9 @@ public:
     }
     inline void add(scene_object* obj){
         objects.push_back(obj);
-        // node_object n(obj);
-        // for(auto &seg : obj->m_path) {
-        //     n.add_segment(seg);
-        // }
-        nodes.push_back(node_object(obj));
     }
     inline void invert() {
         std::reverse(objects.begin(), objects.end());
-        std::reverse(nodes.begin(), nodes.end());
     }
 };
 
@@ -230,6 +260,7 @@ public:
         return m_path;
     }
 };
+
 class accelerated_builder final: public i_scene_data<accelerated_builder> {
 private:
     friend i_scene_data<accelerated_builder>;
@@ -327,14 +358,27 @@ const accelerated accelerate(const scene &c, const window &w,
     accelerated_builder builder(acc, args, make_windowviewport(w, v) * c.get_xf());
     c.get_scene_data().iterate(builder);
     acc.invert();
+    int xl, yb, xr, yt;
+    std::tie(xl, yb) = v.bl();
+    std::tie(xr, yt) = v.tr();
+    leave_node* first_leave = new leave_node(make_R2(xl, yb), make_R2(xr, yt));
+    for(auto &obj : acc.objects) {
+        // insert in a node if collides with cell
+        if(first_leave->intersect(obj)){
+            node_object node_obj(obj);
+            first_leave->add_node_object(node_obj);
+        }
+    }
+    acc.root = first_leave;
     return acc;
 }
 
 RGBA8 sample(const accelerated& a, float x, float y){
     RGBA8 c = make_rgba8(0, 0, 0, 0);
-    for(auto &node : a.nodes) {
-        if(node.hit(x, y)) {
-            c = over(c, pre_multiply(node.get_color(x, y)));
+    auto nod = a.root->get_node_of(x, y);
+    for(auto &nobj : nod->get_objects()) {
+        if(nobj.hit(x, y)) {
+            c = over(c, pre_multiply(nobj.get_color(x, y)));
             if((int) c[3] == 255) {
                 return c;
             }

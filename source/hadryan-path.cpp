@@ -38,6 +38,12 @@ public:
     inline bool hit_inside(const double x, const double y) const {
         return y >= m_p0.get_y() && y < m_p1.get_y() && x >= m_p0.get_x() && x < m_p1.get_x();
     }
+    inline bool intersect(const bouding_box &rhs) const {
+        return m_p1[0] > rhs.m_p0[0] &&
+               m_p1[1] > rhs.m_p0[1] &&
+               rhs.m_p1[0] > m_p0[0] &&
+               rhs.m_p1[1] > m_p0[1];
+    }
 };
 
 class path_segment {
