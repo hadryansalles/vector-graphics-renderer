@@ -63,6 +63,10 @@ public:
         return !(m_bbox.hit_up(x, y) || m_bbox.hit_right(x, y) || m_bbox.hit_down(x, y)) 
               &&(m_bbox.hit_left(x,  y) || implicit_hit(x, y));
     }
+    inline bool intersect_shortcut(const double x, const double y) const {
+        return !(m_bbox.hit_right(x, y) || m_bbox.hit_down(x, y))
+              &&(m_bbox.hit_up(x, y) || m_bbox.hit_left(x, y) || implicit_hit(x, y));
+    }
     inline int get_dir() const {
         return m_dir;
     }
