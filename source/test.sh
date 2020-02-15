@@ -41,9 +41,6 @@ heavy=("blue_butterfly"
 if [[ "$1" =~ "heavy" ]]; then
     heavy=()
 fi
-if [[ "$1" =~ "quad" ]]; then
-    only_quad=1
-fi
 
 [ ! -d $outputs ] && mkdir $outputs
 rm $outputs*
@@ -56,7 +53,7 @@ do
     output=$outputs$filename".png" 
     if [[ $only_quad =~ 0 ]] || [[ "${quad[@]}" =~ "${filename}" ]]; then
         if [[ ! " ${heavy[@]} " =~ " ${filename} " ]]; then
-            $lua $program $driver $input $output
+            $lua $program $driver $input $output $1
         fi
     fi
 done
