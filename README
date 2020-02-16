@@ -8,9 +8,11 @@ radial gradient,
 textures,
 implicit tests,
 openmp parallel for,
-super sampling
+super sampling,
+quad-tree acceleration
 
 arguments:
 -pattern:<samples per pixel>
 -tx:<x translation>
 -ty:<y translation>
+-j:<number of threads>
