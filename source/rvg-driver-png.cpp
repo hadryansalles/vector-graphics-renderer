@@ -216,6 +216,10 @@ public:
         m_tl->destroy();
         m_bl->destroy();
         m_br->destroy();
+        delete m_tr;
+        delete m_tl;
+        delete m_bl;
+        delete m_br;
     }
     const leave_node* get_node_of(const double &x, const double &y) const {
         if(!(x >= m_p0[0] && x < m_p1[0]
@@ -278,8 +282,15 @@ public:
             }
         }
         depth++;
-        return new intern_node(m_p0, m_p1, tr->subdivide(), tl->subdivide(),
-                                           bl->subdivide(), br->subdivide());
+        auto ntr = tr->subdivide(); 
+        auto ntl = tl->subdivide();
+        auto nbl = bl->subdivide(); 
+        auto nbr = br->subdivide();
+        if(ntr != tr) delete tr;
+        if(ntl != tl) delete tl;
+        if(nbl != bl) delete bl;
+        if(nbr != br) delete br;
+        return new intern_node(m_p0, m_p1, ntr, ntl, nbl, nbr);
     }
 };
 
@@ -459,13 +470,16 @@ const accelerated accelerate(const scene &c, const window &w,
         }
     }
     acc.root = first_leave->subdivide();
+    if(first_leave != acc.root) {
+        delete first_leave;
+    }
     return acc;
 }
 
 RGBA8 sample(const accelerated& a, float x, float y){
     RGBA8 c = make_rgba8(0, 0, 0, 0);
-    auto nod = a.root->get_node_of(x, y);
-    if(nod != nullptr) {
+    if(a.root != nullptr) {
+        auto nod = a.root->get_node_of(x, y);
         for(auto &nobj : nod->get_objects()) {
             if(nobj.hit(x, y)) {
                 c = over(c, pre_multiply(nobj.get_color(x, y)));
