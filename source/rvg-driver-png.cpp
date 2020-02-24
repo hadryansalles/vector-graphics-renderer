@@ -147,7 +147,6 @@ public:
 class leave_node;
 class tree_node {
 protected:
-    static int depth;
     static int max_depth;
     const double m_w;
     const double m_h;
@@ -177,7 +176,6 @@ public:
         max_depth = max_;
     } 
 };
-int tree_node::depth = 0;
 int tree_node::max_depth = 2;
 
 class intern_node : public tree_node {
@@ -242,7 +240,7 @@ public:
     const std::vector<node_object>& get_objects() const {
         return m_objects;
     }
-    tree_node* subdivide() {
+    tree_node* subdivide(int depth = 0) {
         if(depth >= max_depth) {
             return this;
         }
@@ -265,10 +263,10 @@ public:
             }
         }
         depth++;
-        auto ntr = tr->subdivide(); 
-        auto ntl = tl->subdivide();
-        auto nbl = bl->subdivide(); 
-        auto nbr = br->subdivide();
+        auto ntr = tr->subdivide(depth); 
+        auto ntl = tl->subdivide(depth);
+        auto nbl = bl->subdivide(depth); 
+        auto nbr = br->subdivide(depth);
         if(ntr != tr) delete tr;
         if(ntl != tl) delete tl;
         if(nbl != bl) delete bl;
@@ -437,13 +435,16 @@ public:
 
 const accelerated accelerate(const scene &c, const window &w,
     const viewport &v, const std::vector<std::string> &args) {
-    accelerated acc;
-    accelerated_builder builder(acc, args, make_windowviewport(w, v) * c.get_xf());
-    c.get_scene_data().iterate(builder);
-    acc.invert();
     int xl, yb, xr, yt;
     std::tie(xl, yb) = v.bl();
     std::tie(xr, yt) = v.tr();
+    accelerated acc;
+    int max_depth = std::log2(std::min(xr-xl, yt-yb)/2.0);
+    printf("max depth: %d\n", max_depth);
+    tree_node::set_max_depth(max_depth); // depth to each cell contain at least 4 sampless
+    accelerated_builder builder(acc, args, make_windowviewport(w, v) * c.get_xf());
+    c.get_scene_data().iterate(builder);
+    acc.invert();
     leave_node* first_leave = new leave_node(make_R2(xl, yb), make_R2(xr, yt));
     for(auto &obj : acc.objects) {
         // insert in a node if collides with cell
