@@ -148,6 +148,7 @@ class leave_node;
 class tree_node {
 protected:
     static int max_depth;
+    static size_t min_paths;
     const double m_w;
     const double m_h;
     const bouding_box m_bbox;
@@ -174,9 +175,13 @@ public:
     {}
     static void set_max_depth(int max_) {
         max_depth = max_;
-    } 
+    }
+    static void set_min_paths(size_t min_) {
+        min_paths = min_;
+    }  
 };
 int tree_node::max_depth = 2;
+size_t tree_node::min_paths = 5;
 
 class intern_node : public tree_node {
     tree_node* m_tr;
@@ -241,7 +246,7 @@ public:
         return m_objects;
     }
     tree_node* subdivide(int depth = 0) {
-        if(depth >= max_depth) {
+        if(depth >= max_depth || this->m_objects.size() < min_paths) {
             return this;
         }
         auto tr = new leave_node(m_pc, m_p1);
@@ -427,6 +432,8 @@ public:
                 acc.threads = std::stoi(value);
             } else if(command == std::string{"-depth"}) {
                 tree_node::set_max_depth(std::stoi(value));
+            } else if(command == std::string{"-min_paths"}) {
+                tree_node::set_min_paths(std::stoi(value));
             }
         }
         push_xf(translation(tx, ty));
