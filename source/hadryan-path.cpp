@@ -50,37 +50,83 @@ class path_segment {
 protected:
     const R2 m_pi;
     const R2 m_pf;
-    const bouding_box m_bbox; // segment bouding box
+    const R2 m_right;
     int m_dir;
+    int m_sh_dir;
 public:
+    const bouding_box m_bbox; // segment bouding box
     path_segment(const R2 &p0, const R2 &p1)
         : m_pi(p0)
         , m_pf(p1)
-        , m_bbox(m_pi, m_pf) 
-        , m_dir(1) { 
-        if(m_pi[1] > m_pf[1]){
-            m_dir = -1;
+        , m_right((m_pf[0] > m_pi[0]) ? m_pf : m_pi)
+        , m_dir((m_pi[1] > m_pf[1]) ? -1 : 1) 
+        , m_sh_dir(-1*m_dir)  
+        , m_bbox(m_pi, m_pf) { 
+        if((m_right == m_pf && m_dir == 1)
+         ||(m_right == m_pi && m_dir == -1)) {
+            m_sh_dir *= -1;
         }
     } 
     inline virtual ~path_segment() {
     }
     virtual bool implicit_hit(double x, double y) const = 0;
+    inline int implicit_value(double x, double y) const {
+        if(m_bbox.hit_inside(x, y)) {
+            return implicit_hit(x, y) ? 1 : -1;
+        } else if((m_right == m_pi && m_dir == -1) || (m_right == m_pf && m_dir == 1)) {
+            // 0 em baixo esquerda
+            // 0 em cima direita
+            if((m_bbox.hit_left(x,y) && m_bbox.hit_down(x,y)) || (m_bbox.hit_right(x,y) && m_bbox.hit_up(x,y))) {
+                return 0;
+            } else if(m_bbox.hit_up(x,y) || m_bbox.hit_left(x,y)) {
+                return 1;
+            } else if(m_bbox.hit_down(x,y) || m_bbox.hit_right(x,y)) {
+                return -1;
+            }
+        } else if((m_right == m_pi && m_dir == 1) || (m_right == m_pf && m_dir == -1)) {
+            // 0 em cima esquerda
+            // 0 em baixo direita
+            if((m_bbox.hit_left(x,y) && m_bbox.hit_up(x,y)) || (m_bbox.hit_right(x,y) && (m_bbox.hit_down(x,y)))) {
+                return 0;
+            } else if(m_bbox.hit_up(x,y) || m_bbox.hit_right(x,y)) {
+                return -1;
+            } else if(m_bbox.hit_down(x,y) || m_bbox.hit_left(x,y)) {
+                return 1;
+            }
+        }
+        assert(true);
+        return 0;
+    }
     inline bool intersect(const double x, const double y) const {
         return !(m_bbox.hit_up(x, y) || m_bbox.hit_right(x, y) || m_bbox.hit_down(x, y)) 
               &&(m_bbox.hit_left(x,  y) || implicit_hit(x, y));
     }
     inline bool intersect_shortcut(const double x, const double y) const {
-        return !(m_bbox.hit_right(x, y) || m_bbox.hit_down(x, y))
-              &&(m_bbox.hit_up(x, y) || m_bbox.hit_left(x, y) || implicit_hit(x, y));
+        return (x < m_right[0] && y >= m_right[1]);
     }
     inline int get_dir() const {
         return m_dir;
+    }
+    inline int get_sh_dir() const  {
+        return m_sh_dir;
     }
     R2 first() const {
         return m_pi;
     }
     R2 last() const {
         return m_pf;
+    }
+    R2 left() const {
+        return (m_pi[0] < m_pf[0]) ? m_pi : m_pf;
+    }
+    R2 right() const {
+        return (m_pi[0] >= m_pf[0]) ? m_pi : m_pf;
+    }
+    R2 top() const {
+        return (m_pi[1] >= m_pf[1]) ? m_pi : m_pf;
+    }
+    R2 bot() const { 
+        return (m_pi[1] < m_pf[1]) ? m_pi : m_pf;
     }
 };
 

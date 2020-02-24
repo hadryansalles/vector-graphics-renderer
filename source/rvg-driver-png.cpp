@@ -40,6 +40,43 @@ namespace rvg {
     namespace driver {
         namespace png {
 
+inline bool totally_inside(int xmin, int xmax, int ymin, int ymax, const path_segment* seg) {
+    R2 left(seg->left());
+    R2 right(seg->right());
+    return (left[0] > xmin && left[0] < xmax && left[1] > ymin && left[1] < ymax) 
+        || (right[0] > xmin && right[0] < xmax && right[1] > ymin && right[1] < ymax);
+}
+
+inline bool hit_v_bound(int cx, int ymin, int ymax, const path_segment* seg) {
+    R2 left(seg->left());
+    R2 right(seg->right());
+    R2 top(seg->top());
+    R2 bot(seg->bot());
+    if(left[0] < cx && right[0] > cx) {
+        if(bot[1] > ymin && top[1] < ymax) {
+            return true;
+        } else if(seg->implicit_value(cx, ymin) * seg->implicit_value(cx, ymax) < 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+inline bool hit_h_bound(int cy, int xmin, int xmax, const path_segment* seg) {
+    R2 left(seg->left());
+    R2 right(seg->right());
+    R2 top(seg->top());
+    R2 bot(seg->bot());
+    if(bot[1] < cy && top[1] > cy) {
+        if(left[0] > xmin && right[0] < xmax) {
+            return true;
+        } else if(seg->implicit_value(xmin, cy) != seg->implicit_value(xmax, cy)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 class scene_object {
 private:
     e_winding_rule m_wrule;
@@ -110,9 +147,6 @@ public:
     const scene_object* m_ptr; 
     inline node_object(const scene_object* ptr)
         : m_ptr(ptr) {
-        for(auto *seg : ptr->m_path) {
-            m_segments.push_back(seg);  
-        }
     }
     inline void add_segment(const path_segment* segment, bool shortcut = false) {
         if(shortcut) {
@@ -122,24 +156,64 @@ public:
         }
     }
     inline bool hit(const double x, const double y) const {
-        if(m_ptr->m_bbox.hit_inside(x, y)) { 
-            int sum = 0;
+        bool in_path = m_ptr->m_bbox.hit_inside(x, y);
+        if(in_path) { 
+            int sum = m_w_increment;
             for(auto &seg : m_segments){
                 if(seg->intersect(x, y)) {
                     sum += seg->get_dir();
                 }
             }
             for(auto &sh : m_shortcuts){
-                if(sh->intersect_shortcut(x, y)) {
+                if(sh->intersect(x, y)){
                     sum += sh->get_dir();
+                } 
+                if(sh->intersect_shortcut(x, y)) {
+                    sum += sh->get_sh_dir();
                 }
             }
             return m_ptr->satisfy_wrule(sum);
         }
         return false;
     }
+    inline void debug(const double& x, const double &y) const {
+        bool in_path = m_ptr->m_bbox.hit_inside(x, y);
+        printf("\tinside path: %d\n", in_path);
+        if(in_path) { 
+            int sum = m_w_increment;
+            for(auto &seg : m_segments){
+                if(seg->intersect(x, y)) {
+                    printf("\t\tintersect normal-seg (%.2f,%.2f) (%.2f,%.2f)\n", 
+                        seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1]);
+                    sum += seg->get_dir();
+                }
+            }
+            for(auto &sh : m_shortcuts){
+                if(sh->intersect(x, y)) {
+                    printf("\t\tintersect shortcut-seg (%.2f,%.2f) (%.2f,%.2f)\n", 
+                        sh->first()[0], sh->first()[1], sh->last()[0], sh->last()[1]);
+                    sum += sh->get_dir();
+                }
+                if(sh->intersect_shortcut(x, y)) {
+                    printf("\t\tintersect shortcut (%.2f,%.2f) (%.2f,%.2f)\n", 
+                        sh->first()[0], sh->first()[1], sh->last()[0], sh->last()[1]);
+                    sum += sh->get_sh_dir();
+                }
+            }
+            printf("\tfinish path with winding: %d\n", sum);
+        }
+    }
+    inline void increment(int inc) {
+        m_w_increment += inc;
+    }
     inline RGBA8 get_color(const double x, const double y) const {
         return m_ptr->get_color(x, y);
+    }
+    inline int get_increment() const {
+        return m_w_increment;
+    }
+    inline size_t get_size() const {
+        return m_segments.size() + m_shortcuts.size();
     }
 };
 
@@ -166,8 +240,8 @@ public:
     }
     virtual ~tree_node()
     {}
-    bool intersect(const scene_object* obj) const{
-        return m_bbox.intersect(obj->m_bbox);
+    bool intersect(const bouding_box& bbox) const{
+        return m_bbox.intersect(bbox);
     }
     virtual const leave_node* get_node_of(const double &x, const double &y) const = 0;
     virtual void destroy() 
@@ -253,16 +327,15 @@ public:
         auto bl = new leave_node(m_p0, m_pc);
         auto br = new leave_node(make_R2(m_pc[0],m_p0[1]), make_R2(m_p1[0],m_pc[1]));
         for(auto &nobj : m_objects) {
-            if(tr->intersect(nobj.m_ptr)) {
-                tr->add_node_object(nobj);
+            if(tr->intersect(nobj.m_ptr->m_bbox)) {    
             }
-            if(tl->intersect(nobj.m_ptr)) {
+            if(tl->intersect(nobj.m_ptr->m_bbox)) {
                 tl->add_node_object(nobj);
             }
-            if(bl->intersect(nobj.m_ptr)) {
+            if(bl->intersect(nobj.m_ptr->m_bbox)) {
                 bl->add_node_object(nobj);
             }
-            if(br->intersect(nobj.m_ptr)) {
+            if(br->intersect(nobj.m_ptr->m_bbox)) {
                 br->add_node_object(nobj);
             }
         }
@@ -285,9 +358,13 @@ public:
     tree_node* root = nullptr;
     std::vector<R2> samples;
     int threads;
+    R2 debug;
+    bool debbuging;
     inline accelerated()
         : samples{make_R2(0, 0)}
         , threads(1)
+        , debug(0, 0)
+        , debbuging(false)
     {}
     inline void destroy() { 
         for(auto &obj : objects) {
@@ -434,6 +511,12 @@ public:
                 tree_node::set_max_depth(std::stoi(value));
             } else if(command == std::string{"-min_paths"}) {
                 tree_node::set_min_paths(std::stoi(value));
+            } else if(command == std::string{"-debug_x"}) {
+                acc.debug = make_R2(std::stof(value), acc.debug[1]);
+                acc.debbuging = true;
+            } else if(command == std::string{"-debug_y"}) {
+                acc.debug = make_R2(acc.debug[0], std::stof(value));
+                acc.debbuging = true;
             }
         }
         push_xf(translation(tx, ty));
@@ -445,18 +528,47 @@ const accelerated accelerate(const scene &c, const window &w,
     int xl, yb, xr, yt;
     std::tie(xl, yb) = v.bl();
     std::tie(xr, yt) = v.tr();
-    accelerated acc;
     int max_depth = std::log2(std::min(xr-xl, yt-yb)/2.0);
     tree_node::set_max_depth(max_depth); // depth to each cell contain at least 4 sampless
+    accelerated acc;
     accelerated_builder builder(acc, args, make_windowviewport(w, v) * c.get_xf());
     c.get_scene_data().iterate(builder);
     acc.invert();
     leave_node* first_leave = new leave_node(make_R2(xl, yb), make_R2(xr, yt));
     for(auto &obj : acc.objects) {
+        node_object node_obj(obj);
         // insert in a node if collides with cell
-        if(first_leave->intersect(obj)){
-            node_object node_obj(obj);
-            first_leave->add_node_object(node_obj);
+        if(first_leave->intersect(obj->m_bbox)){
+            for(auto &seg : obj->m_path) {
+                bool hit_br_tr = hit_v_bound(xr, yb, yt, seg);
+                bool hit_bl_br = hit_h_bound(yb, xl, xr, seg);
+                bool hit_bl_tl = hit_v_bound(xl, yb, yt, seg);
+                bool hit_tl_tr = hit_h_bound(yt, xl, xr, seg);
+                bool total_inside = totally_inside(xl, xr, yb, yt, seg);
+                bool bbox_hit = first_leave->intersect(seg->m_bbox);
+                bool inside = (total_inside || hit_br_tr || hit_bl_br || hit_bl_tl || hit_tl_tr);
+                if(inside) {
+                    node_obj.add_segment(seg, hit_br_tr);
+                }
+                bool hit_br(seg->intersect(xr, yb));
+                if(hit_br) {
+                    node_obj.increment(seg->get_dir());
+                }
+                if(acc.debbuging && inside) {
+                    printf("seg (%.2f,%.2f) (%.2f,%.2f) bbox:%d hit_br_inf:%d hit_br_tr:%d hit_bl_br:%d hit_bl_tl:%d hit_tl_tr:%d tinside:%d\n",
+                        seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], bbox_hit, hit_br, hit_br_tr, hit_bl_br, 
+                        hit_bl_tl, hit_tl_tr, total_inside 
+                    );
+                } else if(acc.debbuging) {
+                    printf("seg REMOVED (%.2f,%.2f) (%.2f,%.2f) bbox:%d hit_br_inf:%d hit_br_tr:%d hit_bl_br:%d hit_bl_tl:%d hit_tl_tr:%d tinside:%d\n",
+                        seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], bbox_hit, hit_br, hit_br_tr, hit_bl_br,  
+                        hit_bl_tl, hit_tl_tr, total_inside 
+                    );
+                }
+            }
+            if(node_obj.get_size() || node_obj.get_increment() != 0) {
+                first_leave->add_node_object(node_obj);
+            }
         }
     }
     acc.root = first_leave->subdivide();
@@ -466,8 +578,22 @@ const accelerated accelerate(const scene &c, const window &w,
     return acc;
 }
 
+void debug(const accelerated& a, float x, float y) {
+    if(a.root != nullptr) {
+        auto nod = a.root->get_node_of(x, y);
+        for(auto &nobj : nod->get_objects()) {
+            nobj.debug(x, y);
+        }
+    }
+}
+
 RGBA8 sample(const accelerated& a, float x, float y){
     RGBA8 c = make_rgba8(0, 0, 0, 0);
+    if(a.debbuging && std::floor(x) == a.debug[0] && std::floor(y) == a.debug[1]) {
+        printf("debug (%.2f,%.2f)\n", x, y);
+        debug(a, x, y);
+        return make_rgba8(0, 255, 0, 255);
+    }
     if(a.root != nullptr) {
         auto nod = a.root->get_node_of(x, y);
         for(auto &nobj : nod->get_objects()) {

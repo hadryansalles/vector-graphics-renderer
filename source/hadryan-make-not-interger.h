@@ -2,7 +2,7 @@
 
 #include "rvg-i-sink.h"
 #include "rvg-i-input-path-f-forwarder.h"
-#define XEPS 0.00001
+#define XEPS 0.001
 
 namespace rvg {
 
