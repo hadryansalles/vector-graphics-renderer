@@ -1,0 +1,39 @@
+2D Computer Graphics
+2020.0
+
+Fifth assignment: Accelerated rendering
+-----------------------------------
+
+1) About the assignment
+
+In this assignment, you will implement one of the two
+acceleration datastructures we discussed in class: The
+shortcut tree, or the shortcut regular grid.  You will also
+present your work to the rest of the class.  Run-time
+performance and correctness will both be considered when
+grading your assignment.
+
+Please remember that visual debugging is fundamental when
+implementing complicated geometric algorithms. Spend some
+time making sure the command line options "-tx", "-ty",
+"-p", and "-pattern" do what they should do:
+
+    -tx:<x> and -ty:<y> translate the scene in screen coordinates
+    -pattern:<n>        loads and uses the blue noise supersampling pattern
+                        with <n> samples
+    -p:<n>              keeps only the nth painted shape in the scene
+
+We will test your code using antialiasing, so make sure to
+do the same!
+
+2) Handing in your assignment
+
+Create a directory with "<first-name>-<last-name>" where
+<first-name> is your first name, and <last-name> is your
+last name. Place your file "render.lua" as well as all your
+new RVG test files inside this directory. Create a zip
+archive "<first-name>-<last-name>.zip" with the contents.
+Send the file to your TA as an attachment to an e-mail with
+the subject "[2dcg] Assignment 5".
+
+Good luck!
