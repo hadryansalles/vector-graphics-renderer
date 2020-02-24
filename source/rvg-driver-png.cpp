@@ -29,13 +29,12 @@
 #include "blue-noise.h"
 #include "hadryan-color.cpp"
 #include "hadryan-path.cpp"
+#include "hadryan-make-not-interger.h"
 
 #include "rvg-i-scene-data.h"
 #include "rvg-lua-facade.h"
 
 #include "rvg-driver-png.h"
-
-#define EPS 0.00001
 
 namespace rvg {
     namespace driver {
@@ -371,7 +370,8 @@ private:
                            make_input_path_f_xform(s_xf,
                            make_input_path_f_downgrade_degenerate(
                            make_input_path_f_monotonize(
-                           path_builder)))));
+                           make_input_path_not_interger(
+                           path_builder))))));
         if(path_builder.get().size() > 0) {
             acc.add(new scene_object(path_builder.get(), wr, p.transformed(top_xf())));
         } 
