@@ -181,7 +181,7 @@ public:
     }  
 };
 int tree_node::max_depth = 2;
-size_t tree_node::min_paths = 5;
+size_t tree_node::min_paths = 100;
 
 class intern_node : public tree_node {
     tree_node* m_tr;
@@ -447,7 +447,6 @@ const accelerated accelerate(const scene &c, const window &w,
     std::tie(xr, yt) = v.tr();
     accelerated acc;
     int max_depth = std::log2(std::min(xr-xl, yt-yb)/2.0);
-    printf("max depth: %d\n", max_depth);
     tree_node::set_max_depth(max_depth); // depth to each cell contain at least 4 sampless
     accelerated_builder builder(acc, args, make_windowviewport(w, v) * c.get_xf());
     c.get_scene_data().iterate(builder);
