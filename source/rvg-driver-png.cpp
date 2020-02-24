@@ -88,23 +88,6 @@ public:
         delete color;
         m_path.clear();
     }
-    // inline bool hit(const double x, const double y) const {
-    //     if(m_bbox.hit_inside(x, y)) { 
-    //         int sum = 0;
-    //         for(auto seg : m_path){
-    //             if(seg->intersect(x, y)) {
-    //                 sum += seg->get_dir();
-    //             }
-    //         }
-    //         if(m_wrule == e_winding_rule::non_zero){
-    //             return (sum != 0);
-    //         }
-    //         else if(m_wrule == e_winding_rule::odd){
-    //             return ((sum % 2)!= 0);
-    //         }
-    //     }
-    //     return false;
-    // }
     inline bool satisfy_wrule(int winding) const {
         if(m_wrule == e_winding_rule::non_zero){
             return (winding != 0);
@@ -489,14 +472,6 @@ RGBA8 sample(const accelerated& a, float x, float y){
             }
         }
     }
-    // for(auto &obj : a.objects) {
-    //     if(obj->hit(x, y)) {
-    //         c = over(c, pre_multiply(obj->get_color(x, y)));
-    //         if((int) c[3] == 255) {
-    //             return c;
-    //         }
-    //     }
-    // }
     return over(c, make_rgba8(255, 255, 255, 255));
 }
 
