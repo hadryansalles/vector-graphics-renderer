@@ -2,7 +2,7 @@
 
 #include "rvg-i-sink.h"
 #include "rvg-i-input-path-f-forwarder.h"
-#define XEPS 0.001
+#define XEPS 0.001f
 
 namespace rvg {
 
@@ -32,7 +32,7 @@ friend i_sink<input_path_not_interger<SINK>>;
     }
 
     inline bool is_int(rvgf a) const {
-        return (a - std::floor(a)) == 0.0f;
+        return (a - std::floor(a)) == 0.00000f;
     }
 
     inline rvgf f(rvgf a) const {

@@ -47,6 +47,10 @@ inline bool totally_inside(int xmin, int xmax, int ymin, int ymax, const path_se
         || (right[0] > xmin && right[0] < xmax && right[1] > ymin && right[1] < ymax);
 }
 
+inline bool totally_inside(R2 bl, R2 tr, const path_segment* seg) {
+    return totally_inside(bl[0], tr[0], bl[1], tr[1], seg);
+}
+
 inline bool hit_v_bound(int cx, int ymin, int ymax, const path_segment* seg) {
     R2 left(seg->left());
     R2 right(seg->right());
@@ -142,8 +146,8 @@ class node_object {
     // only points to segments inside scene_object
     std::vector<const path_segment*> m_segments;
     std::vector<const path_segment*> m_shortcuts;
-    int m_w_increment = 0;
 public:
+    int m_w_increment = 0;
     const scene_object* m_ptr; 
     inline node_object(const scene_object* ptr)
         : m_ptr(ptr) {
@@ -177,9 +181,8 @@ public:
         return false;
     }
     inline void debug(const double& x, const double &y) const {
-        bool in_path = m_ptr->m_bbox.hit_inside(x, y);
-        printf("\tinside path: %d\n", in_path);
-        if(in_path) { 
+        printf("\tstart inc: %d\n", m_w_increment);  
+        if(true) { 
             int sum = m_w_increment;
             for(auto &seg : m_segments){
                 if(seg->intersect(x, y)) {
@@ -215,6 +218,15 @@ public:
     inline size_t get_size() const {
         return m_segments.size() + m_shortcuts.size();
     }
+    const std::vector<const path_segment*> get_all_segments() const {
+        std::vector<const path_segment*> all_seg;
+        all_seg.insert(all_seg.end(), m_segments.begin(), m_segments.end());
+        all_seg.insert(all_seg.end(), m_shortcuts.begin(), m_shortcuts.end());
+        return all_seg;
+    }
+    const std::vector<const path_segment*> get_shortcuts() const {
+        return m_shortcuts;
+    }
 };
 
 class leave_node;
@@ -230,12 +242,12 @@ protected:
     const R2 m_p1;
 public:
     tree_node(const R2 &p0, const R2 &p1) 
-        : m_w(p1[0]-p0[0])
-        , m_h(p1[1]-p0[1])
-        , m_bbox(p0, p1)
-        , m_pc(p0+(make_R2(m_w, m_h)/2.0)) 
-        , m_p0(p0)
-        , m_p1(p1) {
+        : m_w((int)p1[0]-(int)p0[0])
+        , m_h((int)p1[1]-(int)p0[1])
+        , m_bbox(make_R2((int)p0[0], (int)p0[1]), make_R2((int)p1[0], (int)p1[1]))
+        , m_pc(make_R2((int)p0[0], (int)p0[1])+(make_R2((int)(m_w/2), (int)(m_h/2)))) 
+        , m_p0(make_R2((int)p0[0], (int)p0[1]))
+        , m_p1(make_R2((int)p1[0], (int)p1[1])) {
         assert(p0[0] <= p1[0] && p0[1] < p1[1]);
     }
     virtual ~tree_node()
@@ -254,7 +266,7 @@ public:
     }  
 };
 int tree_node::max_depth = 2;
-size_t tree_node::min_paths = 100;
+size_t tree_node::min_paths = 1;
 
 class intern_node : public tree_node {
     tree_node* m_tr;
@@ -319,24 +331,104 @@ public:
         return m_objects;
     }
     tree_node* subdivide(int depth = 0) {
-        if(depth >= max_depth || this->m_objects.size() < min_paths) {
+        if(depth >= max_depth) {
             return this;
         }
+        //printf("ON %.2f,%.2f subdivision\n", m_p0[0], m_p0[1]);
         auto tr = new leave_node(m_pc, m_p1);
         auto tl = new leave_node(make_R2(m_p0[0],m_pc[1]), make_R2(m_pc[0],m_p1[1]));
         auto bl = new leave_node(m_p0, m_pc);
         auto br = new leave_node(make_R2(m_pc[0],m_p0[1]), make_R2(m_p1[0],m_pc[1]));
         for(auto &nobj : m_objects) {
-            if(tr->intersect(nobj.m_ptr->m_bbox)) {    
+            node_object tr_obj(nobj.m_ptr);
+            node_object tl_obj(nobj.m_ptr);
+            node_object bl_obj(nobj.m_ptr);
+            node_object br_obj(nobj.m_ptr);
+            tr_obj.m_w_increment = nobj.m_w_increment;
+            tl_obj.m_w_increment = nobj.m_w_increment;
+            bl_obj.m_w_increment = nobj.m_w_increment;
+            br_obj.m_w_increment = nobj.m_w_increment;
+            auto all_seg(nobj.get_all_segments());
+            for(auto &seg : all_seg) {
+                bool hit_tr_righ = hit_v_bound(m_p1[0], m_pc[1], m_p1[1], seg);
+                bool hit_br_righ = hit_v_bound(m_p1[0], m_p0[1], m_pc[1], seg);
+                bool hit_br_down = hit_h_bound(m_p0[1], m_pc[0], m_p1[0], seg);
+                bool hit_bl_down = hit_h_bound(m_p0[1], m_p0[0], m_pc[0], seg);
+                bool hit_bl_left = hit_v_bound(m_p0[0], m_p0[1], m_pc[1], seg);
+                bool hit_tl_left = hit_v_bound(m_p0[0], m_pc[1], m_p1[1], seg);
+                bool hit_tl_up   = hit_h_bound(m_p1[1], m_p0[0], m_pc[0], seg);
+                bool hit_tr_up   = hit_h_bound(m_p1[1], m_pc[0], m_p1[0], seg);
+                bool hit_tl_tr   = hit_v_bound(m_pc[0], m_pc[1], m_p1[1], seg);
+                bool hit_bl_tl   = hit_h_bound(m_pc[1], m_p0[0], m_pc[0], seg);
+                bool hit_bl_br   = hit_v_bound(m_pc[0], m_p0[1], m_pc[1], seg);
+                bool hit_br_tr   = hit_h_bound(m_pc[1], m_pc[0], m_p1[0], seg);
+                bool hit_c_inf   = seg->intersect(m_pc[0], m_pc[1]);
+                bool hit_cr_inf  = seg->intersect(m_p1[0], m_pc[1]);
+                bool hit_dc_inf  = seg->intersect(m_pc[0], m_p0[1]);
+                bool hit_br_inf  = seg->intersect(m_p1[0], m_p0[1]);
+                if(totally_inside(tr->m_p0, tr->m_p1, seg) || hit_tr_righ || hit_tr_up || hit_tl_tr || hit_br_tr) {
+                    tr_obj.add_segment(seg, hit_tr_righ);
+                    // printf("\ttr(%.2f,%.2f) add(%.2f,%.2f)(%.2f,%.2f)\n",
+                    // tr->m_p0[0],tr->m_p0[1],seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1]);
+                }
+                if(totally_inside(tl->m_p0, tl->m_p1, seg) || hit_tl_left || hit_tl_tr || hit_tl_up || hit_bl_tl) {
+                    tl_obj.add_segment(seg, hit_tl_tr);
+                    // printf("\ttl(%.2f,%.2f) add(%.2f,%.2f)(%.2f,%.2f) tr_tl:%d\n",
+                    // tl->m_p0[0],tl->m_p0[1],seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], hit_tl_tr);
+                }
+                if(totally_inside(bl->m_p0, bl->m_p1, seg) || hit_bl_br || hit_bl_down || hit_bl_left || hit_bl_tl) {
+                    bl_obj.add_segment(seg, hit_bl_br);
+                    // printf("\tbl(%.2f,%.2f) add(%.2f,%.2f)(%.2f,%.2f)\n",
+                    // bl->m_p0[0],bl->m_p0[1],seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1]);
+                }
+                if(totally_inside(br->m_p0, br->m_p1, seg) || hit_br_down || hit_br_righ || hit_br_tr || hit_bl_br) {
+                    br_obj.add_segment(seg, hit_br_righ);
+                    // printf("\tbr(%.2f,%.2f) add(%.2f,%.2f)(%.2f,%.2f)\n",
+                    // br->m_p0[0],br->m_p0[1],seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1]);
+                } 
+                if(hit_c_inf) {
+                    tl_obj.increment(seg->get_dir());
+                }
+                if(hit_cr_inf) {
+                    tr_obj.increment(seg->get_dir());
+                }
+                if(hit_dc_inf) {
+                    bl_obj.increment(seg->get_dir());
+                }
+                if(hit_br_inf) {
+                    br_obj.increment(seg->get_dir());
+                }
+                // printf("\tseg(%.2f,%.2f)(%.2f,%.2f) c_inf:%d cr_inf:%d\n", seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], hit_c_inf, hit_cr_inf);
             }
-            if(tl->intersect(nobj.m_ptr->m_bbox)) {
-                tl->add_node_object(nobj);
+            for(auto &shortcut : nobj.get_shortcuts()) {
+                bool hit_c_inf   = shortcut->intersect_shortcut(m_pc[0], m_pc[1]);
+                bool hit_cr_inf  = shortcut->intersect_shortcut(m_p1[0], m_pc[1]);
+                bool hit_dc_inf  = shortcut->intersect_shortcut(m_pc[0], m_p0[1]);
+                bool hit_br_inf  = shortcut->intersect_shortcut(m_p1[0], m_p0[1]);
+                if(hit_c_inf) {
+                    tl_obj.increment(shortcut->get_sh_dir());
+                }
+                if(hit_cr_inf) {
+                    tr_obj.increment(shortcut->get_sh_dir());
+                }
+                if(hit_dc_inf) {
+                    bl_obj.increment(shortcut->get_sh_dir());
+                }
+                if(hit_br_inf) {
+                    br_obj.increment(shortcut->get_sh_dir());
+                }
             }
-            if(bl->intersect(nobj.m_ptr->m_bbox)) {
-                bl->add_node_object(nobj);
+            if(tr_obj.get_size() || tr_obj.get_increment() != 0) {
+                tr->add_node_object(tr_obj);
             }
-            if(br->intersect(nobj.m_ptr->m_bbox)) {
-                br->add_node_object(nobj);
+            if(tl_obj.get_size() || tl_obj.get_increment() != 0) {
+                tl->add_node_object(tl_obj);
+            }
+            if(bl_obj.get_size() || bl_obj.get_increment() != 0) {
+                bl->add_node_object(bl_obj);
+            }
+            if(br_obj.get_size() || br_obj.get_increment() != 0) {
+                br->add_node_object(br_obj);
             }
         }
         depth++;
