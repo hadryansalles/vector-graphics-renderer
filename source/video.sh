@@ -17,5 +17,5 @@ for ((y=$yi; y<=$yf; y+=$dy)) do
 	((i++))
 done
 ffmpeg -framerate 30 -i ../video/$in-%05d.png -y ../$in.mp4
-rm -rf  ../video
 open ../$in.mp4
+rm -rf ../video

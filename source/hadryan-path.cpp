@@ -154,7 +154,7 @@ protected:
     const double m_C;
     const double m_D;
     const double m_E;
-    const int m_der;
+    const double m_der;
 public:
     quadratic(const R2 &p0, const R2 &p1, const R2& p2, double w = 1.0) 
         : path_segment(p0, p2)
