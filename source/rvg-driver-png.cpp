@@ -368,23 +368,15 @@ public:
                 bool hit_br_inf  = seg->intersect(m_p1[0], m_p0[1]);
                 if(totally_inside(tr->m_p0, tr->m_p1, seg) || hit_tr_righ || hit_tr_up || hit_tl_tr || hit_br_tr) {
                     tr_obj.add_segment(seg, hit_tr_righ);
-                    // printf("\ttr(%.2f,%.2f) add(%.2f,%.2f)(%.2f,%.2f)\n",
-                    // tr->m_p0[0],tr->m_p0[1],seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1]);
                 }
                 if(totally_inside(tl->m_p0, tl->m_p1, seg) || hit_tl_left || hit_tl_tr || hit_tl_up || hit_bl_tl) {
                     tl_obj.add_segment(seg, hit_tl_tr);
-                    // printf("\ttl(%.2f,%.2f) add(%.2f,%.2f)(%.2f,%.2f) tr_tl:%d\n",
-                    // tl->m_p0[0],tl->m_p0[1],seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], hit_tl_tr);
                 }
                 if(totally_inside(bl->m_p0, bl->m_p1, seg) || hit_bl_br || hit_bl_down || hit_bl_left || hit_bl_tl) {
                     bl_obj.add_segment(seg, hit_bl_br);
-                    // printf("\tbl(%.2f,%.2f) add(%.2f,%.2f)(%.2f,%.2f)\n",
-                    // bl->m_p0[0],bl->m_p0[1],seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1]);
                 }
                 if(totally_inside(br->m_p0, br->m_p1, seg) || hit_br_down || hit_br_righ || hit_br_tr || hit_bl_br) {
                     br_obj.add_segment(seg, hit_br_righ);
-                    // printf("\tbr(%.2f,%.2f) add(%.2f,%.2f)(%.2f,%.2f)\n",
-                    // br->m_p0[0],br->m_p0[1],seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1]);
                 } 
                 if(hit_c_inf) {
                     tl_obj.increment(seg->get_dir());
@@ -398,7 +390,6 @@ public:
                 if(hit_br_inf) {
                     br_obj.increment(seg->get_dir());
                 }
-                // printf("\tseg(%.2f,%.2f)(%.2f,%.2f) c_inf:%d cr_inf:%d\n", seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], hit_c_inf, hit_cr_inf);
             }
             for(auto &shortcut : nobj.get_shortcuts()) {
                 bool hit_c_inf   = shortcut->intersect_shortcut(m_pc[0], m_pc[1]);
