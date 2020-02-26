@@ -446,12 +446,12 @@ public:
     std::vector<R2> samples;
     int threads;
     R2 debug;
-    bool debbuging;
+    bool debugging;
     inline accelerated()
         : samples{make_R2(0, 0)}
         , threads(1)
         , debug(0, 0)
-        , debbuging(false)
+        , debugging(false)
     {}
     inline void destroy() { 
         for(auto &obj : objects) {
@@ -600,10 +600,10 @@ public:
                 tree_node::set_min_segments(std::stoi(value));
             } else if(command == std::string{"-debug_x"}) {
                 acc.debug = make_R2(std::stof(value), acc.debug[1]);
-                acc.debbuging = true;
+                acc.debugging = true;
             } else if(command == std::string{"-debug_y"}) {
                 acc.debug = make_R2(acc.debug[0], std::stof(value));
-                acc.debbuging = true;
+                acc.debugging = true;
             }
         }
         push_xf(translation(tx, ty));
@@ -641,12 +641,12 @@ const accelerated accelerate(const scene &c, const window &w,
                 if(hit_br) {
                     node_obj.increment(seg->get_dir());
                 }
-                if(acc.debbuging && inside) {
+                if(acc.debugging && inside) {
                     printf("seg (%.2f,%.2f) (%.2f,%.2f) bbox:%d hit_br_inf:%d hit_br_tr:%d hit_bl_br:%d hit_bl_tl:%d hit_tl_tr:%d tinside:%d\n",
                         seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], bbox_hit, hit_br, hit_br_tr, hit_bl_br, 
                         hit_bl_tl, hit_tl_tr, total_inside 
                     );
-                } else if(acc.debbuging) {
+                } else if(acc.debugging) {
                     printf("seg REMOVED (%.2f,%.2f) (%.2f,%.2f) bbox:%d hit_br_inf:%d hit_br_tr:%d hit_bl_br:%d hit_bl_tl:%d hit_tl_tr:%d tinside:%d\n",
                         seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], bbox_hit, hit_br, hit_br_tr, hit_bl_br,  
                         hit_bl_tl, hit_tl_tr, total_inside 
@@ -688,7 +688,7 @@ inline RGBA8 sample_cell(const leave_node* nod, const double &x, const double &y
 }
 
 inline RGBA8 sample(const accelerated& a, float x, float y){
-    if(a.debbuging && std::floor(x) == a.debug[0] && std::floor(y) == a.debug[1]) {
+    if(a.debugging && std::floor(x) == a.debug[0] && std::floor(y) == a.debug[1]) {
         printf("debug (%.2f,%.2f)\n", x, y);
         debug(a, x, y);
         return make_rgba8(0, 255, 0, 255);
