@@ -218,7 +218,6 @@ rvg-util.o: INC += $(LP_INC)
 rvg-driver-distroke.o: INC += $(LUA_INC)
 rvg-driver-svg.o: INC += $(LUA_INC)
 rvg-driver-eps.o: INC += $(LUA_INC)
-hadryan-driver-png.o: INC += $(LUA_INC)
 rvg-driver-rvg-lua.o: INC += $(LUA_INC)
 rvg-driver-rvg-cpp.o: INC += $(LUA_INC)
 rvg-driver-nvpr.o: INC += $(LUA_INC) $(EGL_INC)
@@ -226,6 +225,8 @@ rvg-driver-cairo.o: INC += $(LUA_INC) $(CAIRO_INC)
 rvg-driver-qt5.o: INC += $(LUA_INC) $(QT5_INC)
 rvg-driver-skia.o: INC += $(LUA_INC) $(SKIA_INC)
 rvg-driver-rg.o: INC += $(LUA_INC)
+
+hadryan-driver-png.o: INC += $(LUA_INC) 
 
 rvg-freetype.o: INC += $(FT_INC)
 test-text.o: INC += $(FT_INC)
@@ -277,7 +278,7 @@ DRV_OBJ := rvg-lua-base64.o \
 	rvg-lua-paint.o \
 	rvg-lua-scene.o \
 	rvg-lua.o \
-	strokers/rvg-stroker-rvg.o
+	strokers/rvg-stroker-rvg.o 
 
 SO_STROKERS_OBJ := strokers/rvg-lua-strokers.o $(DRV_OBJ) $(ST_OBJ)
 SO_BASE64_OBJ:= rvg-lua-base64.o rvg-base64.o rvg-lua.o
@@ -303,7 +304,7 @@ SO_FILTER_OBJ:= \
 
 SO_HARFBUZZ_OBJ:= rvg-lua-harfbuzz.o rvg-lua.o
 
-SO_PNG_DRV_OBJ:= hadryan-driver-png.o $(DRV_OBJ)
+SO_PNG_DRV_OBJ:= hadryan-driver-png.o hadryan-color.o $(DRV_OBJ)
 SO_SVG_DRV_OBJ:= rvg-driver-svg.o $(DRV_OBJ)
 SO_EPS_DRV_OBJ:= rvg-driver-eps.o $(DRV_OBJ)
 SO_NVPR_DRV_OBJ:= rvg-driver-nvpr.o $(DRV_OBJ)
@@ -623,6 +624,10 @@ config:
 	@echo LP_INC: $(LP_INC)
 
 DIST_CPP_SRC := \
+	hadryan-color.cpp \
+	hadryan-color.h \
+	hadryan-driver-png.cpp \
+	hadryan-driver-png.h \
 	rvg-adjacent-range.h \
 	rvg-align.h \
 	rvg-arc-length.h \
@@ -650,8 +655,6 @@ DIST_CPP_SRC := \
 	rvg-decorated-path-f-thicken.h \
 	rvg-driver-cairo.cpp \
 	rvg-driver-cairo.h \
-	hadryan-driver-png.cpp \
-	hadryan-driver-png.h \
 	rvg-driver-eps.cpp \
 	rvg-driver-eps.h \
 	rvg-driver-rvg-cpp.cpp \
