@@ -6,6 +6,8 @@ namespace rvg {
 namespace driver {
 namespace png {
 
+#define EPS 0.00001
+
 class bouding_box {
 private:
     R2 m_p0;

@@ -28,13 +28,12 @@
 
 #include "blue-noise.h"
 #include "hadryan-color.cpp"
-#include "hadryan-path.cpp"
+#include "hadryan-path.hpp"
 #include "hadryan-make-not-interger.h"
+#include "hadryan-driver-png.h"
 
 #include "rvg-i-scene-data.h"
 #include "rvg-lua-facade.h"
-
-#include "rvg-driver-png.h"
 
 namespace rvg {
     namespace driver {

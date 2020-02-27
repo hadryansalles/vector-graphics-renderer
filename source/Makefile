@@ -41,6 +41,7 @@ LP_LIB_Linux=$(shell $(PKG) --libs lapack)
 #---
 # Subset of targets to build
 #---
+vg_build_png=yes
 vg_build_strokers?=no
 vg_build_cairo?=no
 vg_build_qt5?=no
@@ -49,7 +50,6 @@ vg_build_distroke?=no
 vg_build_nvpr?=no
 vg_build_tests?=no
 vg_build_gperftools?=no
-
 #---
 # Probably no need to change anything below here
 #---
@@ -201,7 +201,6 @@ rvg-lua-texture-data.o: INC += $(LUA_INC)
 rvg-lua-paint.o: INC += $(LUA_INC)
 rvg-lua-scene.o: INC += $(LUA_INC)
 rvg-xform-svd.o: INC += $(LP_INC)
-
 rvg-lua-chronos.o: INC += $(LUA_INC)
 rvg-lua-util.o: INC += $(LUA_INC)
 ifeq ($(vg_build_gperftools),yes)
@@ -219,7 +218,7 @@ rvg-util.o: INC += $(LP_INC)
 rvg-driver-distroke.o: INC += $(LUA_INC)
 rvg-driver-svg.o: INC += $(LUA_INC)
 rvg-driver-eps.o: INC += $(LUA_INC)
-rvg-driver-png.o: INC += $(LUA_INC) 
+hadryan-driver-png.o: INC += $(LUA_INC)
 rvg-driver-rvg-lua.o: INC += $(LUA_INC)
 rvg-driver-rvg-cpp.o: INC += $(LUA_INC)
 rvg-driver-nvpr.o: INC += $(LUA_INC) $(EGL_INC)
@@ -304,7 +303,7 @@ SO_FILTER_OBJ:= \
 
 SO_HARFBUZZ_OBJ:= rvg-lua-harfbuzz.o rvg-lua.o
 
-SO_PNG_DRV_OBJ:= rvg-driver-png.o $(DRV_OBJ)
+SO_PNG_DRV_OBJ:= hadryan-driver-png.o $(DRV_OBJ)
 SO_SVG_DRV_OBJ:= rvg-driver-svg.o $(DRV_OBJ)
 SO_EPS_DRV_OBJ:= rvg-driver-eps.o $(DRV_OBJ)
 SO_NVPR_DRV_OBJ:= rvg-driver-nvpr.o $(DRV_OBJ)
@@ -354,7 +353,6 @@ OBJ:= \
 
 TARGETS:= \
 	driver/rvg_cpp.so \
-	driver/png.so \
 	driver/rvg_lua.so \
 	driver/eps.so \
 	driver/svg.so \
@@ -558,7 +556,7 @@ driver/distroke.so: $(SO_DISTROKE_DRV_OBJ)
 
 driver/png.so: $(SO_PNG_DRV_OBJ)
 	mkdir -p driver
-	$(CXX) $(SOLDFLAGS) -o $@ $^ $(PNG_LIB) $(B64_LIB) $(OMP_LIB) $(LP_LIB) 
+	$(CXX) $(SOLDFLAGS) -o $@ $^ $(PNG_LIB) $(B64_LIB) $(LP_LIB) $(OMP_LIB)
 
 driver/svg.so: $(SO_SVG_DRV_OBJ)
 	mkdir -p driver
@@ -652,8 +650,8 @@ DIST_CPP_SRC := \
 	rvg-decorated-path-f-thicken.h \
 	rvg-driver-cairo.cpp \
 	rvg-driver-cairo.h \
-	rvg-driver-png.cpp \
-	rvg-driver-png.h \
+	hadryan-driver-png.cpp \
+	hadryan-driver-png.h \
 	rvg-driver-eps.cpp \
 	rvg-driver-eps.h \
 	rvg-driver-rvg-cpp.cpp \
