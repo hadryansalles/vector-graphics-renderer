@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HADRYAN_COLOR
+#define HADRYAN_COLOR
 
 #include "rvg-paint.h"
 
@@ -13,7 +14,7 @@ protected:
     double spread(e_spread spread, double t) const;
 public:
     color_solver(const paint& pat);
-    virtual ~color_solver();
+    virtual ~color_solver() = default;
     virtual RGBA8 solve(double x, double y) const;
 };
 
@@ -62,4 +63,6 @@ public:
 };
 
 }}}
+
+#endif // !HADRYAN_COLOR
 

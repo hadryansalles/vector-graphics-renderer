@@ -27,7 +27,7 @@
 #include "rvg-input-path-f-downgrade-degenerate.h"
 
 #include "blue-noise.h"
-#include "hadryan-color.cpp"
+#include "hadryan-color.h"
 #include "hadryan-path.hpp"
 #include "hadryan-make-not-interger.h"
 #include "hadryan-driver-png.h"

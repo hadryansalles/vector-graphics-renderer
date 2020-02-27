@@ -1,68 +1,4 @@
-#pragma once
-
-#include "rvg-paint.h"
-
-namespace rvg {
-    namespace driver {
-        namespace png {
-
-class color_solver {
-protected:
-    paint m_paint;
-    const xform m_inv_xf;
-    double spread(e_spread spread, double t) const;
-public:
-    color_solver(const paint& pat);
-    virtual ~color_solver();
-    virtual RGBA8 solve(double x, double y) const;
-};
-
-class color_gradient_solver : public color_solver {
-protected:
-    color_ramp m_ramp;
-    std::vector<color_stop> m_stops;
-    unsigned int m_stops_size;
-    RGBA8 wrap(double t) const;
-    virtual double convert(R2 p) const = 0;
-public:
-    color_gradient_solver(const paint &pat, const color_ramp &ramp);
-    virtual ~color_gradient_solver() = default;
-    virtual RGBA8 solve(double x, double y) const;
-};
-
-class linear_gradient_solver : public color_gradient_solver {
-private:
-    const linear_gradient_data m_data;
-    const R2 m_p1;
-    const R2 m_p2_p1;
-    const double m_dot_p2_p1;
-    double convert(R2 p) const;
-public:
-    linear_gradient_solver(const paint& pat);
-};
-
-class radial_gradient_solver : public color_gradient_solver {
-private:
-    const radial_gradient_data m_data;
-    xform  m_xf;
-    double m_B;
-    double m_C;
-    double convert(R2 p_in) const;
-public:
-    radial_gradient_solver(const paint& pat);
-};  
-
-class texture_solver : public color_solver {
-    const i_image::const_ptr m_image_ptr;
-    const e_spread m_spread;
-    const int m_w, m_h;
-public:
-    texture_solver(const paint &pat);
-    RGBA8 solve(double x, double y) const;
-};
-
-}}}
-
+#include "hadryan-color.h"
 
 namespace rvg {
     namespace driver {
@@ -70,12 +6,12 @@ namespace rvg {
 
 // ----- abstract color solver
 
-inline color_solver::color_solver(const paint& pat)
+ color_solver::color_solver(const paint& pat)
     : m_paint(pat)
     , m_inv_xf(m_paint.get_xf().inverse())
 {}
 
-inline double color_solver::spread(e_spread spread, double t) const {
+double color_solver::spread(e_spread spread, double t) const {
     double rt = t;
     if(t < 0 || t > 1) {
         switch(spread){
@@ -113,14 +49,14 @@ RGBA8 color_solver::solve(double x, double y) const {
 
 // ----- abstract gradient solver
 
-inline color_gradient_solver::color_gradient_solver(const paint &pat, const color_ramp &ramp) 
+color_gradient_solver::color_gradient_solver(const paint &pat, const color_ramp &ramp) 
     : color_solver(pat)
     , m_ramp(ramp)
     , m_stops(m_ramp.get_color_stops())
     , m_stops_size(m_stops.size())
 {}
 
-inline RGBA8 color_gradient_solver::wrap(double t) const {
+RGBA8 color_gradient_solver::wrap(double t) const {
     RGBA8 color(0, 0, 0, 0);
     if(m_stops_size > 0) {
         if(t <= m_stops[0].get_offset()){
@@ -162,7 +98,7 @@ RGBA8 color_gradient_solver::solve(double x, double y) const {
 
 // ----- linear gradient solver
 
-inline linear_gradient_solver::linear_gradient_solver(const paint& pat)
+linear_gradient_solver::linear_gradient_solver(const paint& pat)
     : color_gradient_solver(pat, pat.get_linear_gradient_data().get_color_ramp())
     , m_data(m_paint.get_linear_gradient_data())
     , m_p1(m_data.get_x1(), m_data.get_y1())
@@ -176,7 +112,7 @@ double linear_gradient_solver::convert(R2 p) const {
 
 // ----- radial gradient solver
 
-inline radial_gradient_solver::radial_gradient_solver(const paint& pat)
+radial_gradient_solver::radial_gradient_solver(const paint& pat)
     : color_gradient_solver(pat, pat.get_radial_gradient_data().get_color_ramp())
     , m_data(pat.get_radial_gradient_data()) {
     m_xf = identity().translated(-m_data.get_cx(), -m_data.get_cy()).scaled(1/m_data.get_r());
@@ -205,7 +141,7 @@ double radial_gradient_solver::convert(R2 p_in) const {
 
 // ----- texture color solver
 
-inline texture_solver::texture_solver(const paint &pat)
+texture_solver::texture_solver(const paint &pat)
     : color_solver(pat)
     , m_image_ptr(pat.get_texture_data().get_image_ptr())
     , m_spread(pat.get_texture_data().get_spread())
