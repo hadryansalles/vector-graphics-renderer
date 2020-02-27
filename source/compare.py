@@ -25,5 +25,5 @@ for i in range(len(gt)) :
         os.system("open " + outp+out[i])
         exit()
 
-print("complete.")
+print("complete. all images are equal.")
     
