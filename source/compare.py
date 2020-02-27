@@ -2,7 +2,7 @@
 import cv2
 import os
 
-gtp = "../pngs/"
+gtp = "../pngs-gt/"
 outp = "../pngs-out/"
 gt = os.listdir(gtp)
 out = os.listdir(outp)
