@@ -1,6 +1,6 @@
 !#usr/bin/bash
-xi=-200
-xf=200
+xi=-100
+xf=100
 yi=0
 yf=0
 dx=1

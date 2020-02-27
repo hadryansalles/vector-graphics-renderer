@@ -215,7 +215,7 @@ public:
     inline int get_increment() const {
         return m_w_increment;
     }
-    inline size_t get_size() const {
+    inline int get_size() const {
         return m_segments.size() + m_shortcuts.size();
     }
     const std::vector<const path_segment*> get_all_segments() const {
@@ -233,7 +233,7 @@ class leave_node;
 class tree_node {
 protected:
     static int max_depth;
-    static size_t min_paths;
+    static int min_segments;
     const double m_w;
     const double m_h;
     const bouding_box m_bbox;
@@ -248,7 +248,6 @@ public:
         , m_pc(make_R2((int)p0[0], (int)p0[1])+(make_R2((int)(m_w/2), (int)(m_h/2)))) 
         , m_p0(make_R2((int)p0[0], (int)p0[1]))
         , m_p1(make_R2((int)p1[0], (int)p1[1])) {
-        assert(p0[0] <= p1[0] && p0[1] < p1[1]);
     }
     virtual ~tree_node()
     {}
@@ -261,12 +260,15 @@ public:
     static void set_max_depth(int max_) {
         max_depth = max_;
     }
-    static void set_min_paths(size_t min_) {
-        min_paths = min_;
+    static void set_min_segments(int min_) {
+        min_segments = min_;
     }  
+    inline bool is_in_cell(const double &x, const double &y) const {
+        return x >= (double) m_p0[0] && x < (double) m_p1[0] && y >= (double) m_p0[1] && y < (double) m_p1[1];
+    }
 };
 int tree_node::max_depth = 2;
-size_t tree_node::min_paths = 1;
+int tree_node::min_segments = 1;
 
 class intern_node : public tree_node {
     tree_node* m_tr;
@@ -315,9 +317,11 @@ public:
 
 class leave_node : public tree_node {
     std::vector<node_object> m_objects;
+    int m_n_segments;
 public:
     leave_node(const R2 &p0, const R2 &p1)
         : tree_node(p0, p1)
+        , m_n_segments(0)
     {}
     const leave_node* get_node_of(const double &x, const double &y) const {
         (void) x;
@@ -326,15 +330,15 @@ public:
     }
     void add_node_object(const node_object &node_obj) {
         m_objects.push_back(node_obj);
+        m_n_segments += node_obj.get_size();
     }
     const std::vector<node_object>& get_objects() const {
         return m_objects;
     }
     tree_node* subdivide(int depth = 0) {
-        if(depth >= max_depth) {
+        if(depth >= max_depth || m_n_segments < min_segments) {
             return this;
         }
-        //printf("ON %.2f,%.2f subdivision\n", m_p0[0], m_p0[1]);
         auto tr = new leave_node(m_pc, m_p1);
         auto tl = new leave_node(make_R2(m_p0[0],m_pc[1]), make_R2(m_pc[0],m_p1[1]));
         auto bl = new leave_node(m_p0, m_pc);
@@ -442,12 +446,12 @@ public:
     std::vector<R2> samples;
     int threads;
     R2 debug;
-    bool debbuging;
+    bool debugging;
     inline accelerated()
         : samples{make_R2(0, 0)}
         , threads(1)
         , debug(0, 0)
-        , debbuging(false)
+        , debugging(false)
     {}
     inline void destroy() { 
         for(auto &obj : objects) {
@@ -592,14 +596,14 @@ public:
                 acc.threads = std::stoi(value);
             } else if(command == std::string{"-depth"}) {
                 tree_node::set_max_depth(std::stoi(value));
-            } else if(command == std::string{"-min_paths"}) {
-                tree_node::set_min_paths(std::stoi(value));
+            } else if(command == std::string{"-min_seg"}) {
+                tree_node::set_min_segments(std::stoi(value));
             } else if(command == std::string{"-debug_x"}) {
                 acc.debug = make_R2(std::stof(value), acc.debug[1]);
-                acc.debbuging = true;
+                acc.debugging = true;
             } else if(command == std::string{"-debug_y"}) {
                 acc.debug = make_R2(acc.debug[0], std::stof(value));
-                acc.debbuging = true;
+                acc.debugging = true;
             }
         }
         push_xf(translation(tx, ty));
@@ -637,12 +641,12 @@ const accelerated accelerate(const scene &c, const window &w,
                 if(hit_br) {
                     node_obj.increment(seg->get_dir());
                 }
-                if(acc.debbuging && inside) {
+                if(acc.debugging && inside) {
                     printf("seg (%.2f,%.2f) (%.2f,%.2f) bbox:%d hit_br_inf:%d hit_br_tr:%d hit_bl_br:%d hit_bl_tl:%d hit_tl_tr:%d tinside:%d\n",
                         seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], bbox_hit, hit_br, hit_br_tr, hit_bl_br, 
                         hit_bl_tl, hit_tl_tr, total_inside 
                     );
-                } else if(acc.debbuging) {
+                } else if(acc.debugging) {
                     printf("seg REMOVED (%.2f,%.2f) (%.2f,%.2f) bbox:%d hit_br_inf:%d hit_br_tr:%d hit_bl_br:%d hit_bl_tl:%d hit_tl_tr:%d tinside:%d\n",
                         seg->first()[0], seg->first()[1], seg->last()[0], seg->last()[1], bbox_hit, hit_br, hit_br_tr, hit_bl_br,  
                         hit_bl_tl, hit_tl_tr, total_inside 
@@ -670,25 +674,44 @@ void debug(const accelerated& a, float x, float y) {
     }
 }
 
-RGBA8 sample(const accelerated& a, float x, float y){
+inline RGBA8 sample_cell(const leave_node* nod, const double &x, const double &y) {
     RGBA8 c = make_rgba8(0, 0, 0, 0);
-    if(a.debbuging && std::floor(x) == a.debug[0] && std::floor(y) == a.debug[1]) {
+    for(auto &nobj : nod->get_objects()) {
+        if(nobj.hit(x, y)) {
+            c = over(c, pre_multiply(nobj.get_color(x, y)));
+            if((int) c[3] == 255) {
+                return c;
+            }
+        }
+    }   
+    return over(c, make_rgba8(255, 255, 255, 255)); 
+}
+
+inline RGBA8 sample(const accelerated& a, float x, float y){
+    if(a.debugging && std::floor(x) == a.debug[0] && std::floor(y) == a.debug[1]) {
         printf("debug (%.2f,%.2f)\n", x, y);
         debug(a, x, y);
         return make_rgba8(0, 255, 0, 255);
     }
     if(a.root != nullptr) {
         auto nod = a.root->get_node_of(x, y);
-        for(auto &nobj : nod->get_objects()) {
-            if(nobj.hit(x, y)) {
-                c = over(c, pre_multiply(nobj.get_color(x, y)));
-                if((int) c[3] == 255) {
-                    return c;
-                }
+        if(nod != nullptr) {
+            std::vector<int> color{0, 0, 0, 255};
+            for(auto &sp : a.samples) {
+                double mx = x + sp[0];
+                double my = y + sp[1];
+                RGBA8 sp_color(remove_gamma(sample_cell(nod, mx, my)));
+                color[0] += (int)sp_color[0];
+                color[1] += (int)sp_color[1];
+                color[2] += (int)sp_color[2];
             }
+            color[0] /= a.samples.size();
+            color[1] /= a.samples.size();
+            color[2] /= a.samples.size();
+            return add_gamma(make_rgba8(color[0], color[1], color[2], color[3]));
         }
     }
-    return over(c, make_rgba8(255, 255, 255, 255));
+    return RGBA8(255,255,255,255);
 }
 
 void render(accelerated &a, const window &w, const viewport &v,
@@ -705,19 +728,9 @@ void render(accelerated &a, const window &w, const viewport &v,
     #pragma omp parallel for num_threads(a.threads)
     for (int i = 1; i <= height; i++) {
         for (int j = 1; j <= width; j++) {
-            std::vector<int> color{0, 0, 0, 255};
-            for(auto &sp : a.samples) {
-                double y = yb+i-0.5+sp[0];
-                double x = xl+j-0.5+sp[1];
-                RGBA8 sp_color(remove_gamma(sample(a, x, y)));
-                color[0] += (int)sp_color[0];
-                color[1] += (int)sp_color[1];
-                color[2] += (int)sp_color[2];
-            }
-            color[0] /= a.samples.size();
-            color[1] /= a.samples.size();
-            color[2] /= a.samples.size();
-            RGBA8 g_color = add_gamma(make_rgba8(color[0], color[1], color[2], color[3]));
+            double x = xl+j-0.5;
+            double y = yb+i-0.5;
+            RGBA8 g_color(sample(a, x, y));
             out_image.set_pixel(j-1, i-1, g_color[0], g_color[1], g_color[2], 255);
         }
     }
