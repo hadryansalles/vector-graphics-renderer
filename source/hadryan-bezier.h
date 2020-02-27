@@ -1,3 +1,4 @@
+#pragma once
 
 #include "rvg-point.h"
 #include <vector>
