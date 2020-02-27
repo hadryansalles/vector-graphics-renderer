@@ -4,8 +4,6 @@
 #include "rvg-paint.h"
 
 namespace rvg {
-    namespace driver {
-        namespace png {
 
 class color_solver {
 protected:
@@ -54,6 +52,7 @@ public:
 };  
 
 class texture_solver : public color_solver {
+private:
     const i_image::const_ptr m_image_ptr;
     const e_spread m_spread;
     const int m_w, m_h;
@@ -62,7 +61,7 @@ public:
     RGBA8 solve(double x, double y) const;
 };
 
-}}}
+}
 
 #endif // !HADRYAN_COLOR
 

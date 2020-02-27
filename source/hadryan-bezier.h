@@ -9,6 +9,7 @@ namespace png {
 #define EPS 0.00001
 
 class bouding_box {
+    
 private:
     R2 m_p0;
     R2 m_p1;
@@ -96,7 +97,6 @@ public:
                 return 1;
             }
         }
-        assert(true);
         return 0;
     }
     inline bool intersect(const double x, const double y) const {
@@ -112,22 +112,22 @@ public:
     inline int get_sh_dir() const  {
         return m_sh_dir;
     }
-    R2 first() const {
+    inline R2 first() const {
         return m_pi;
     }
-    R2 last() const {
+    inline R2 last() const {
         return m_pf;
     }
-    R2 left() const {
+    inline R2 left() const {
         return (m_pi[0] < m_pf[0]) ? m_pi : m_pf;
     }
-    R2 right() const {
+    inline R2 right() const {
         return (m_pi[0] >= m_pf[0]) ? m_pi : m_pf;
     }
-    R2 top() const {
+    inline R2 top() const {
         return (m_pi[1] >= m_pf[1]) ? m_pi : m_pf;
     }
-    R2 bot() const { 
+    inline R2 bot() const { 
         return (m_pi[1] < m_pf[1]) ? m_pi : m_pf;
     }
 };

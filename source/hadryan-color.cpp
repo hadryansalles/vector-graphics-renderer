@@ -1,12 +1,10 @@
 #include "hadryan-color.h"
 
 namespace rvg {
-    namespace driver {
-        namespace png {
 
 // ----- abstract color solver
 
- color_solver::color_solver(const paint& pat)
+color_solver::color_solver(const paint& pat)
     : m_paint(pat)
     , m_inv_xf(m_paint.get_xf().inverse())
 {}
@@ -165,4 +163,4 @@ RGBA8 texture_solver::solve(double x, double y) const {
     return color;
 }
 
-}}}
+}

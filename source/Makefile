@@ -304,7 +304,7 @@ SO_FILTER_OBJ:= \
 
 SO_HARFBUZZ_OBJ:= rvg-lua-harfbuzz.o rvg-lua.o
 
-SO_PNG_DRV_OBJ:= hadryan-driver-png.o hadryan-color.o $(DRV_OBJ)
+SO_PNG_DRV_OBJ:= hadryan-driver-png.o hadryan-color.o hadryan-bezier.o $(DRV_OBJ)
 SO_SVG_DRV_OBJ:= rvg-driver-svg.o $(DRV_OBJ)
 SO_EPS_DRV_OBJ:= rvg-driver-eps.o $(DRV_OBJ)
 SO_NVPR_DRV_OBJ:= rvg-driver-nvpr.o $(DRV_OBJ)
@@ -626,6 +626,8 @@ config:
 DIST_CPP_SRC := \
 	hadryan-color.cpp \
 	hadryan-color.h \
+	hadryan-bezier.cpp \
+	hadryan-bezier.h \
 	hadryan-driver-png.cpp \
 	hadryan-driver-png.h \
 	rvg-adjacent-range.h \

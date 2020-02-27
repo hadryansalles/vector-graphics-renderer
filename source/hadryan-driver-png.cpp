@@ -28,7 +28,7 @@
 
 #include "blue-noise.h"
 #include "hadryan-color.h"
-#include "hadryan-path.hpp"
+#include "hadryan-bezier.h"
 #include "hadryan-make-not-interger.h"
 #include "hadryan-driver-png.h"
 

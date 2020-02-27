@@ -1,4 +1,5 @@
-#pragma once 
+#ifndef HADRYAN_MAKE_NOT_INTERGER
+#define HADRYAN_MAKE_NOT_INTERGER
 
 #include "rvg-i-sink.h"
 #include "rvg-i-input-path-f-forwarder.h"
@@ -81,3 +82,5 @@ auto make_input_path_not_interger(SINK &&sink) {
 }
 
 }
+
+#endif // !HADRYAN_MAKE_NOT_INTERGER
