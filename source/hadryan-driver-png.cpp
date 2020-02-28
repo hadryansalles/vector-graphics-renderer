@@ -26,6 +26,16 @@ namespace rvg {
     namespace driver {
         namespace png {
 
+
+void accelerated::destroy() { 
+    for(auto &obj : objects) {
+        delete obj;
+        obj = NULL;
+    }
+    root->destroy();
+    delete root;
+}
+
 const accelerated accelerate(const scene &c, const window &w,
     const viewport &v, const std::vector<std::string> &args) {
     int xl, yb, xr, yt;
