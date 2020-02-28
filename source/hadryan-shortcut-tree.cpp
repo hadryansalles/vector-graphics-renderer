@@ -269,15 +269,34 @@ tree_node* leave_node::subdivide(int depth) {
         }
     }
     depth++;
-    auto ntr = tr->subdivide(depth); 
-    auto ntl = tl->subdivide(depth);
-    auto nbl = bl->subdivide(depth); 
-    auto nbr = br->subdivide(depth);
-    if(ntr != tr) delete tr;
-    if(ntl != tl) delete tl;
-    if(nbl != bl) delete bl;
-    if(nbr != br) delete br;
-    return new intern_node(m_p0, m_p1, ntr, ntl, nbl, nbr);
+    tree_node* ntr = nullptr; 
+    tree_node* ntl = nullptr;
+    tree_node* nbl = nullptr; 
+    tree_node* nbr = nullptr;
+    #pragma omp task shared(ntr)
+    {
+        ntr = tr->subdivide(depth);
+    }
+    #pragma omp task shared(ntl)
+    {
+        ntl = tl->subdivide(depth);
+    }
+    #pragma omp task shared(nbl)
+    {
+        nbl = bl->subdivide(depth);
+    }
+    #pragma omp task shared(nbr)
+    {
+        nbr = br->subdivide(depth);
+    }
+    #pragma omp taskwait 
+    {
+        if(ntr != tr) delete tr;
+        if(ntl != tl) delete tl;
+        if(nbl != bl) delete bl;
+        if(nbr != br) delete br;
+        return new intern_node(m_p0, m_p1, ntr, ntl, nbl, nbr);
+    }
 }
 
 }}}

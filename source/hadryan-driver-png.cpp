@@ -84,7 +84,13 @@ const accelerated accelerate(const scene &c, const window &w,
             }
         }
     }
-    acc.root = first_leave->subdivide();
+    #pragma omp parallel num_threads(acc.threads)
+    {
+        #pragma omp single
+        {
+            acc.root = first_leave->subdivide();
+        }
+    }
     if(first_leave != acc.root) {
         delete first_leave;
     }
