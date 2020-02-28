@@ -4,9 +4,9 @@
 #include "hadryan-bezier.h"
 #include "hadryan-color.h"
 
-namespace rvg{
-    namespace driver{
-        namespace png{
+namespace rvg {
+    namespace driver {
+        namespace png {
 
 inline bool totally_inside(int xmin, int xmax, int ymin, int ymax, const path_segment* seg) {
     R2 left(seg->left());
