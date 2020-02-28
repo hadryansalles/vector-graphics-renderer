@@ -77,7 +77,7 @@ friend i_input_path<input_path_not_interger<SINK>>;
 };
 
 template <typename SINK>
-auto make_input_path_not_interger(SINK &&sink) {
+inline auto make_input_path_not_interger(SINK &&sink) {
     return input_path_not_interger<SINK>{std::forward<SINK>(sink)};
 }
 

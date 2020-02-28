@@ -38,8 +38,8 @@ public:
     path_segment(const R2 &p0, const R2 &p1);
     virtual ~path_segment() = default;
     
-    virtual bool implicit_hit(double x, double y) const = 0;
     int implicit_value(double x, double y) const;
+    virtual bool implicit_hit(double x, double y) const = 0;
     
     bool intersect(const double x, const double y) const;
     bool intersect_shortcut(const double x, const double y) const;
