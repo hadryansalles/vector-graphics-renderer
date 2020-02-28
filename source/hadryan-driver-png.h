@@ -10,11 +10,41 @@
 #include "rvg-window.h"
 #include "rvg-scene.h"
 
+#include "hadryan-shortcut-tree.h"
+
 namespace rvg {
     namespace driver {
         namespace png {
 
-class accelerated;
+class accelerated {
+public:
+    std::vector<scene_object*> objects;
+    tree_node* root = nullptr;
+    std::vector<R2> samples;
+    int threads;
+    R2 debug;
+    bool debugging;
+    inline accelerated()
+        : samples{make_R2(0, 0)}
+        , threads(1)
+        , debug(0, 0)
+        , debugging(false)
+    {}
+    inline void destroy() { 
+        for(auto &obj : objects) {
+            delete obj;
+            obj = NULL;
+        }
+        root->destroy();
+        delete root;
+    }
+    inline void add(scene_object* obj){
+        objects.push_back(obj);
+    }
+    inline void invert() {
+        std::reverse(objects.begin(), objects.end());
+    }
+};
 
 const accelerated accelerate(const scene &c, const window &w,
     const viewport &v);

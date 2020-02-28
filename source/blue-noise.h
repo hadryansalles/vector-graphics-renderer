@@ -1,10 +1,13 @@
 
 #pragma once
+
 #include "rvg-point.h"
 #include <vector>
+
 std::vector<rvg::R2> blue_1 {
     rvg::make_R2(0, 0)
 };
+
 std::vector<rvg::R2> blue_8 {
     rvg::make_R2(-0.266471, 0.164718),
     rvg::make_R2(0.353688, 0.0396624),
@@ -15,6 +18,7 @@ std::vector<rvg::R2> blue_8 {
     rvg::make_R2(-0.139007, -0.475235),
     rvg::make_R2(0.207413, -0.328058)
 };
+
 std::vector<rvg::R2> blue_16 {
     rvg::make_R2(-0.15588000, 0.47011700),
     rvg::make_R2(0.30975700, 0.36190700),
@@ -33,6 +37,7 @@ std::vector<rvg::R2> blue_16 {
     rvg::make_R2(-0.47645700, 0.11612000),
     rvg::make_R2(0.45528900, -0.10737200)
 };
+
 std::vector<rvg::R2> blue_32 {
     rvg::make_R2(0.18936400, -0.34008000),
     rvg::make_R2(0.31758200, 0.40063000),
@@ -67,6 +72,7 @@ std::vector<rvg::R2> blue_32 {
     rvg::make_R2(-0.06095580, 0.12207700),
     rvg::make_R2(-0.25435800, 0.13223200)
 };
+
 std::vector<rvg::R2> blue_64 {
     rvg::make_R2(0.16914500, 0.03865330),
     rvg::make_R2(-0.18599500, 0.12891000),
