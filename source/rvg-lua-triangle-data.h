@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_TRIANGLE_DATA_H
 #define RVG_LUA_TRIANGLE_DATA_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-triangle-data.h"
 

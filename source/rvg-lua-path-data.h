@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_PATH_DATA_H
 #define RVG_LUA_PATH_DATA_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-path-data.h"
 

@@ -228,6 +228,17 @@ public:
         return m_type;
     }
 
+    const char *type_name(void) const {
+        switch (m_type) {
+            case e_type::solid_color: return "solid_color";
+            case e_type::linear_gradient: return "linear_gradient";
+            case e_type::radial_gradient: return "radial_gradient";
+            case e_type::texture: return "texture";
+            case e_type::empty: return "empty";
+            default: return "uninitialized?"; // shouldn't happen
+        }
+    }
+
     bool is_solid_color(void) const {
         return m_type == e_type::solid_color;
     }

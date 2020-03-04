@@ -3,7 +3,6 @@
 #include <cmath>
 #include <vector>
 
-#include <lua.h>
 #include "rvg-lua.h"
 #include "rvg-lua-facade.h"
 
@@ -372,7 +371,7 @@ const accelerated accelerate(const scene &c, const window &w,
 
     xform flip = make_translation(0.f,-static_cast<float>(yb)).
         scaled(1.f,-1.f).translated(0.f,static_cast<float>(yt));
-    xform screen_xf = flip * make_windowviewport(w, v) * c.get_xf();
+    xform screen_xf = flip * c.get_xf().windowviewport(w, v).translated(-xl, yb);
 
     SkPictureRecorder recorder;
     SkCanvas* canvas = recorder.beginRecording({0, 0,

@@ -5,7 +5,6 @@
 #include <cmath>
 #include <memory>
 
-#include <lua.h>
 #include "rvg-lua.h"
 
 #include "rvg-i-input-path.h"
@@ -385,7 +384,7 @@ const accelerated accelerate(const scene &c, const window &w,
     std::tie(xr, yt) = v.tr();
     xform flip = make_translation(0,-static_cast<rvgf>(yb)).
         scaled(1,-1).translated(0,static_cast<rvgf>(yt));
-    xform screen_xf = flip * make_windowviewport(w, v) * c.get_xf();
+    xform screen_xf = flip * c.get_xf().windowviewport(w, v).translated(-xl, yb);
 
     cairo_surface_t *surface = cairo_recording_surface_create(CAIRO_CONTENT_COLOR_ALPHA, nullptr);
     cairo_t *cr = cairo_create(surface);

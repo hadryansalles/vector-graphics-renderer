@@ -1,6 +1,5 @@
 #include <sstream>
 
-#include <lua.h>
 #include "rvg-lua.h"
 #include "rvg-lua-facade.h"
 #include "rvg-scene-f-print-rvg.h"

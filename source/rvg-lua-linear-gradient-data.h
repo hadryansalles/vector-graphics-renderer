@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_LINEAR_GRADIENT_DATA_H
 #define RVG_LUA_LINEAR_GRADIENT_DATA_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-linear-gradient-data.h"
 

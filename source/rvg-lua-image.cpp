@@ -2,8 +2,6 @@
 #include <array>
 #include <new>
 
-#include <lua.h>
-#include <lauxlib.h>
 #include "rvg-lua.h"
 
 #include "rvg-i-image.h"

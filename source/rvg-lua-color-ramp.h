@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_COLOR_RAMP_H
 #define RVG_LUA_COLOR_RAMP_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-color-ramp.h"
 

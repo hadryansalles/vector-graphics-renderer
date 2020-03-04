@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_WINDING_RULE_H
 #define RVG_LUA_WINDING_RULE_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-winding-rule.h"
 

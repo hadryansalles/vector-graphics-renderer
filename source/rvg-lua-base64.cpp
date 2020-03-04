@@ -1,6 +1,4 @@
 #include <cstdio>
-#include <lua.h>
-#include <lauxlib.h>
 #include <sstream>
 
 #include "rvg-lua.h"

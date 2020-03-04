@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_POLYGON_DATA_H
 #define RVG_LUA_POLYGON_DATA_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-polygon-data.h"
 

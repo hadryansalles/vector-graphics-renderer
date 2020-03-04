@@ -30,9 +30,19 @@ private:
 
 friend i_scene_data<scene_f_spy<SINK>>;
 
-	void do_painted_shape(e_winding_rule rule, const shape &s,
-                const paint &p) {
-        m_out << m_name << "painted_shape\n";
+    const char *winding_rule_name(e_winding_rule rule) {
+        switch (rule) {
+            case e_winding_rule::odd: return "odd";
+            case e_winding_rule::non_zero: return "non_zero";
+            case e_winding_rule::even: return "even";
+            case e_winding_rule::zero: return "zero";
+        }
+    }
+
+	void do_painted_shape(e_winding_rule rule, const shape &s, const paint &p) {
+        m_out << m_name << "painted_shape(" << winding_rule_name(rule) <<
+            ", " << s.type_name() << ", " <<
+            p.type_name() << ")\n";
         m_sink.painted_shape(rule, s, p);
 	}
 
@@ -52,7 +62,8 @@ friend i_scene_data<scene_f_spy<SINK>>;
 	}
 
 	void do_stencil_shape(e_winding_rule rule, const shape &s) {
-        m_out << m_name << "stencil_shape\n";
+        m_out << m_name << "stencil_shape(" << winding_rule_name(rule) <<
+            ", " << s.type_name() << ")\n";
         m_sink.stencil_shape(rule, s);
 	}
 

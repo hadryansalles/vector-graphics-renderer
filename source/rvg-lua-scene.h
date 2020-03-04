@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_SCENE_H
 #define RVG_LUA_SCENE_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-scene.h"
 

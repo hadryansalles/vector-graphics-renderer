@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_RGBA_H
 #define RVG_LUA_RGBA_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-circle-data.h"
 

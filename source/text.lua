@@ -55,7 +55,7 @@ function _M.text(driver, string, facename_or_filename, features)
         ymax = max(ymax, ycursor+m.horiz_bearing_y)
         -- add glyph to path, translated by cursor
         g:iterate(
-          filter.xform(
+          filter.make_input_path_f_xform(
             driver.translation(
                 xcursor + positions[i].x_offset,
                 ycursor + positions[i].y_offset

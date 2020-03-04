@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_FACADE_DRIVER_H
 #define RVG_LUA_FACADE_DRIVER_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-scene-data.h"
 

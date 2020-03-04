@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_XFORM_H
 #define RVG_LUA_XFORM_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-xform.h"
 

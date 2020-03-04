@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_UTIL_H
 #define RVG_LUA_UTIL_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 extern "C"
 #ifndef _WIN32

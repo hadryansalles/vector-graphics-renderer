@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_PAINT_H
 #define RVG_LUA_PAINT_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-paint.h"
 

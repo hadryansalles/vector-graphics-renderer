@@ -251,7 +251,7 @@ static int unpack(lua_State *L) {
 static int ipairsaux (lua_State *L) {
     lua_Integer i = luaL_checkinteger(L, 2) + 1;
     lua_pushinteger(L, i);
-    return (lua_geti(L, 1, i) == LUA_TNIL) ? 1 : 2;
+    return (rvg_lua_geti(L, 1, i) == LUA_TNIL) ? 1 : 2;
 }
 
 // copied Lua 5.3.4

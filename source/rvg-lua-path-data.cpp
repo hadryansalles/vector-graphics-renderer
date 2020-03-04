@@ -232,9 +232,39 @@ static int path_data_backward_end_dash_parameter(lua_State *L) {
     return path_data_invoke_method<rvgf>(L, &path_data::backward_end_dash_parameter);
 }
 
+static int path_data_clear(lua_State *L) {
+    path_data::ptr p = rvg_lua_check<path_data::ptr>(L, 1);
+    p->clear();
+    return 0;
+}
+
+static int path_data_shrink_to_fit(lua_State *L) {
+    path_data::ptr p = rvg_lua_check<path_data::ptr>(L, 1);
+    p->shrink_to_fit();
+    return 0;
+}
+
+template <typename PTR>
+static int path_data_size(lua_State *L) {
+    PTR p = rvg_lua_check<PTR>(L, 1);
+    lua_pushinteger(L, static_cast<lua_Integer>(p->size()));
+    return 1;
+}
+
+template <typename PTR>
+static int path_data_empty(lua_State *L) {
+    PTR p = rvg_lua_check<PTR>(L, 1);
+    lua_pushboolean(L, p->empty());
+    return 1;
+}
+
 static luaL_Reg path_data__index[] = {
+    {"size", &path_data_size<path_data::ptr> },
+    {"empty", &path_data_empty<path_data::ptr> },
     {"iterate", &path_data_iterate<path_data::ptr> },
     {"riterate", &path_data_riterate<path_data::ptr> },
+    {"clear", path_data_clear },
+    {"shrink_to_fit", path_data_shrink_to_fit },
     {"begin_contour", path_data_begin_contour},
     {"end_open_contour", path_data_end_open_contour},
     {"end_closed_contour", path_data_end_closed_contour},
@@ -282,6 +312,8 @@ static luaL_Reg path_data__index[] = {
 };
 
 static luaL_Reg const_path_data__index[] = {
+    {"size", &path_data_size<path_data::ptr> },
+    {"empty", &path_data_size<path_data::ptr> },
     {"iterate", &path_data_iterate<path_data::const_ptr> },
     {"riterate", &path_data_riterate<path_data::const_ptr> },
     { nullptr, nullptr }

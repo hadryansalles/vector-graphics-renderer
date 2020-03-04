@@ -16,6 +16,7 @@
 
 #include "rvg-input-path-f-xform.h"
 #include "rvg-input-path-f-close-contours.h"
+#include "rvg-input-path-f-downgrade-degenerates.h"
 #include "rvg-input-path-f-find-cubic-parameters.h"
 #include "rvg-input-path-f-find-monotonic-parameters.h"
 #include "rvg-input-path-f-rational-quadratic-to-cubics.h"
@@ -668,12 +669,6 @@ static int lua_path_f_to_path_init(lua_State *L, const char *path_f_name,
     return 0;
 }
 
-static auto make_lua_input_path_f_xform(lua_State *L) {
-    return make_path_f_forward_if(L,
-        make_input_path_f_xform(rvg_lua_check<xform>(L, 1),
-            make_path_f_to_lua_path_ref(L, 2)));
-}
-
 static auto make_lua_input_path_f_close_all_contours(lua_State *L) {
     return make_path_f_forward_if(L,
         make_input_path_f_close_all_contours(
@@ -692,6 +687,23 @@ static auto make_lua_input_path_f_close_contours(lua_State *L) {
 
 static int filter_make_input_path_f_close_contours(lua_State *L) {
     return rvg_lua_push(L, make_lua_input_path_f_close_contours(L));
+}
+
+static auto make_lua_input_path_f_downgrade_degenerates(lua_State *L) {
+    return make_path_f_forward_if(L,
+        make_input_path_f_downgrade_degenerates(
+            luaL_checknumber(L, 1),
+            make_path_f_to_lua_path_ref(L, 2)));
+}
+
+static int filter_make_input_path_f_downgrade_degenerates(lua_State *L) {
+    return rvg_lua_push(L, make_lua_input_path_f_downgrade_degenerates(L));
+}
+
+static auto make_lua_input_path_f_xform(lua_State *L) {
+    return make_path_f_forward_if(L,
+        make_input_path_f_xform(rvg_lua_check<xform>(L, 1),
+            make_path_f_to_lua_path_ref(L, 2)));
 }
 
 static int filter_make_input_path_f_xform(lua_State *L) {
@@ -753,6 +765,8 @@ static const luaL_Reg modfilter[] = {
     {"make_path_f_spy", filter_make_path_f_spy},
     {"make_input_path_f_close_all_contours", filter_make_input_path_f_close_all_contours},
     {"make_input_path_f_close_contours", filter_make_input_path_f_close_contours},
+    {"make_input_path_f_downgrade_degenerates",
+        filter_make_input_path_f_downgrade_degenerates},
     {"make_input_path_f_find_cubic_parameters",
         filter_make_input_path_f_find_cubic_parameters},
     {"make_input_path_f_find_monotonic_parameters",
@@ -776,6 +790,10 @@ int rvg_lua_filters_init(lua_State *L, int ctxidx) {
     lua_path_f_to_path_init<
         decltype(make_lua_input_path_f_close_contours(nullptr))
     >(L, "input_path_f_close_contours", ctxidx);
+
+    lua_path_f_to_path_init<
+        decltype(make_lua_input_path_f_downgrade_degenerates(nullptr))
+    >(L, "input_path_f_downgrade_degenerates", ctxidx);
 
     lua_path_f_to_path_init<
         decltype(make_lua_path_f_spy_snk(nullptr))

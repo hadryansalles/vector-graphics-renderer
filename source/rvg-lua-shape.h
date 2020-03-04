@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_SHAPE_H
 #define RVG_LUA_SHAPE_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-shape.h"
 

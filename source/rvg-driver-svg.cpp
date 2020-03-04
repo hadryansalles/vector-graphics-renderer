@@ -2,7 +2,6 @@
 #include <string>
 #include <sstream>
 
-#include <lua.h>
 #include "rvg-lua.h"
 
 #include "rvg-lua-facade.h"

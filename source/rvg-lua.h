@@ -1,8 +1,16 @@
 #ifndef RVG_LUA_H
 #define RVG_LUA_H
 
+#ifndef RVG_LUAPP
+extern "C" {
+#endif
 #include <lua.h>
+#include <lualib.h>
 #include <lauxlib.h>
+#ifndef RVG_LUAPP
+}
+#endif
+
 #include <utility>
 #include <vector>
 #include <string>

@@ -11,14 +11,42 @@
 using namespace rvg;
 
 template <typename PTR>
+static int scene_data_riterate(lua_State *L) {
+    auto p = rvg_lua_check<PTR>(L, 1);
+    p->riterate(make_scene_f_to_lua_scene_in_stack(L, 2));
+    return 0;
+}
+
+
+template <typename PTR>
 static int scene_data_iterate(lua_State *L) {
     auto p = rvg_lua_check<PTR>(L, 1);
     p->iterate(make_scene_f_to_lua_scene_in_stack(L, 2));
     return 0;
 }
 
+template <typename PTR>
+static int scene_data_riterate_brackets(lua_State *L) {
+    auto p = rvg_lua_check<PTR>(L, 1);
+    p->riterate_brackets(make_scene_f_to_lua_scene_in_stack(L, 2));
+    return 0;
+}
+
+
+template <typename PTR>
+static int scene_data_iterate_brackets(lua_State *L) {
+    auto p = rvg_lua_check<PTR>(L, 1);
+    p->iterate_brackets(make_scene_f_to_lua_scene_in_stack(L, 2));
+    return 0;
+}
+
 static luaL_Reg const_scene_data__index[] = {
     {"iterate", &scene_data_iterate<scene_data::const_ptr> },
+    {"riterate", &scene_data_riterate<scene_data::const_ptr> },
+    {"iterate_brackets",
+        &scene_data_iterate_brackets<scene_data::const_ptr> },
+    {"riterate_brackets",
+        &scene_data_riterate_brackets<scene_data::const_ptr> },
     { nullptr, nullptr }
 };
 
@@ -131,6 +159,9 @@ static int scene_data_end_clip(lua_State *L) {
 
 static luaL_Reg scene_data__index[] = {
     {"iterate", &scene_data_iterate<scene_data::ptr> },
+    {"riterate", &scene_data_riterate<scene_data::ptr> },
+    {"iterate_brackets", &scene_data_iterate_brackets<scene_data::ptr> },
+    {"riterate_brackets", &scene_data_riterate_brackets<scene_data::ptr> },
 	{"painted_shape", scene_data_painted_shape},
 	{"tensor_product_patch", scene_data_tensor_product_patch},
 	{"coons_patch", scene_data_coons_patch},

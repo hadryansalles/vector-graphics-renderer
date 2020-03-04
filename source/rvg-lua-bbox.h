@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_BBOX_H
 #define RVG_LUA_BBOX_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-window.h"
 #include "rvg-viewport.h"

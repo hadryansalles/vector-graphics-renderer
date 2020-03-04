@@ -1,8 +1,5 @@
 #include <cmath>
 
-#include <lua.h>
-#include <lauxlib.h>
-
 #include "rvg-lua.h"
 #include "rvg-util.h"
 #include "rvg-floatint.h"

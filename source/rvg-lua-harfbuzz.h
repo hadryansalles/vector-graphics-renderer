@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_HARFBUZZ_H
 #define RVG_LUA_HARFBUZZ_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 int rvg_lua_harfbuzz_export(lua_State *L, int ctxidx);
 int rvg_lua_harfbuzz_init(lua_State *L, int ctxidx);

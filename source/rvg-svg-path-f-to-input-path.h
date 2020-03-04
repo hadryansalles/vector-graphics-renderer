@@ -57,6 +57,8 @@ friend i_svg_path<svg_path_f_to_input_path<SINK>>;
         ensure_begun();
         m_sink.end_closed_contour(m_current_x, m_current_y);
         m_begun = false;
+        set_current(m_start_x, m_start_y);
+        set_previous(m_start_x, m_start_y);
     }
 
     void do_line_to_abs(rvgf x1, rvgf y1) {

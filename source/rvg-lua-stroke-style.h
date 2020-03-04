@@ -1,7 +1,7 @@
 #ifndef RVG_LUA_STROKE_STYLE_H
 #define RVG_LUA_STROKE_STYLE_H
 
-#include <lua.h>
+#include "rvg-lua.h"
 
 #include "rvg-stroke-style.h"
 

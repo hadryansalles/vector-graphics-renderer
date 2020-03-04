@@ -119,35 +119,39 @@ friend i_sink<path_f_find_offsetting_parameters<SINK>>;
     template <typename SEG>
     void process_quadratic_segment_piece(rvgf ti, rvgf tf, rvgf x0, rvgf y0,
         rvgf x1, rvgf y1, rvgf x2, rvgf y2, SEG sink_segment) {
-        rvgf b = (x1-x0)*(x0-2.f*x1+x2) + (y1-y0)*(y0-2.f*y1+y2);
-        rvgf a = util::sq(x0-2.f*x1+x2) + util::sq(y0-2.f*y1+y2);
-        rvgf q = 4.f*(x2*(y0-y1) + x0*(y1-y2) + x1*(y2-y0));
-        rvgf dx0 = 2.f*(x1-x0), dx1 = 2.f*(x2-x1);
-        rvgf dy0 = 2.f*(y1-y0), dy1 = 2.f*(y2-y1);
-        auto f = [dx0, dx1, dy0, dy1](rvgf t) {
-            rvgf p = util::sq((1.f-t)*dx0 + t*dx1) +
-                util::sq((1.f-t)*dy0 + t*dy1);
+        rvgf b = (x1-x0)*(x0-rvgf{2}*x1+x2) + (y1-y0)*(y0-rvgf{2}*y1+y2);
+        rvgf a = util::sq(x0-rvgf{2}*x1+x2) + util::sq(y0-rvgf{2}*y1+y2);
+        rvgf q = rvgf{4.}*(x2*(y0-y1) + x0*(y1-y2) + x1*(y2-y0));
+        rvgf dx0 = rvgf{2.}*(x1-x0), dx1 = rvgf{2.}*(x2-x1);
+        rvgf dy0 = rvgf{2.}*(y1-y0), dy1 = rvgf{2.}*(y2-y1);
+        auto f = [&](rvgf t) {
+            rvgf p = util::sq((rvgf{1.}-t)*dx0 + t*dx1) +
+                util::sq((rvgf{1.}-t)*dy0 + t*dy1);
             return p*std::sqrt(p);
+        };
+        auto df = [&](rvgf t) {
+            rvgf p = util::sq((rvgf{1.}-t)*dx0 + t*dx1) +
+                util::sq((rvgf{1.}-t)*dy0 + t*dy1);
+            return rvgf{1.5}*std::sqrt(p);
         };
         rvgf z = m_offset*std::fabs(q);
         rvgf s = rvgf(util::sgn(a));
         b *= s; a *= s;
         // two intervals to test for roots
         if (a != 0 && -b >= ti*a && -b <= tf*a) {
-            rvgf root = 0.f;
+            rvgf root = rvgf{0.};
             rvgf c = -b/a;
             m_sink.evolute_cusp_parameter(c);
-            // ??D maybe change bisect to safe newton?
-            if (bisect(f, ti, c, z, &root)) {
+            if (safe_newton<rvgf>(f, df, ti, c, z, &root)) {
                 m_sink.offset_cusp_parameter(root);
             }
-            if (bisect(f, c, tf, z, &root)) {
+            if (safe_newton<rvgf>(f, df, c, tf, z, &root)) {
                 m_sink.offset_cusp_parameter(root);
             }
         // one interval to test for roots
         } else {
-            rvgf root = 0.f;
-            if (bisect(f, ti, tf, z, &root)) {
+            rvgf root = rvgf{0.};
+            if (safe_newton<rvgf>(f, df, ti, tf, z, &root)) {
                 m_sink.offset_cusp_parameter(root);
             }
         }
@@ -212,14 +216,14 @@ friend i_sink<path_f_find_offsetting_parameters<SINK>>;
     void process_rational_quadratic_segment_piece(rvgf ti, rvgf tf, rvgf u0, rvgf v0,
         rvgf u1, rvgf v1, rvgf w1, rvgf u2, rvgf v2, SEG sink_segment) {
         // ensure we are dealing with an elliptic arc
-        assert(w1 > -1.f && w1 < 1.f);
+        assert(w1 > rvgf{-1.} && w1 < rvgf{1.});
         using namespace boost::adaptors;
         auto s = m_offset;
         // build wu(t) ( w(t) wu'(t) - w'(t) wu(t) ) +
         //   wv(t) ( w(t) wv'(t) - w'(t) wv(t) )
         auto u = std::make_tuple(u0, u1, u2);
         auto v = std::make_tuple(v0, v1, v2);
-        auto w = std::make_tuple(1.f, w1, 1.f);
+        auto w = std::make_tuple(rvgf{1.}, w1, rvgf{1.});
         auto du = bezier_derivative(u);
         auto dv = bezier_derivative(v);
         auto dw = bezier_derivative(w);
@@ -333,7 +337,7 @@ friend i_sink<path_f_find_offsetting_parameters<SINK>>;
             bezier_product<rvgf>(q, dp),
             bezier_product<rvgf>(dq, p),
             [](rvgf a, rvgf b) {
-                return 1.5f*a - b;
+                return rvgf{1.5}*a - b;
             }
         );
         // find roots of 3 q(t) p'(t) - 2 q'(t) p(t)

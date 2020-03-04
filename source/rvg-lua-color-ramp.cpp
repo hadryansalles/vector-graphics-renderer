@@ -78,17 +78,21 @@ color_ramp::const_ptr rvg_lua_color_ramp_create(lua_State *L, int base) {
     luaL_checktype(L, base+1, LUA_TTABLE);
     if (n > 2) luaL_error(L, "too many arguments (needed 2)");
     n = rvg_lua_len(L, base+1);
-    auto get = [](lua_State *L, int tab, int item) {
+    auto get = [prev=0.f](lua_State *L, int tab, int item) mutable {
 		lua_rawgeti(L, tab, item);
 		if (lua_type(L, -1) != LUA_TTABLE)
 			luaL_error(L, "index %d not a stop", item);
 		lua_rawgeti(L, -1, 1);
 		if (lua_type(L, -1) != LUA_TNUMBER)
 			luaL_error(L, "invalid offset at stop %d", item);
+        auto cur = rvg_lua_tofloat(L, -1);
+        if (cur < prev || cur > 1.f)
+			luaL_error(L, "invalid offset %f at stop %d", cur, item);
+        prev = cur;
 		lua_rawgeti(L, -2, 2);
 		if (!rvg_lua_is<RGBA8>(L, -1))
 			luaL_error(L, "invalid color at stop %d", item);
-		color_stop s{rvg_lua_tofloat(L, -2), rvg_lua_to<RGBA8>(L, -1)};
+		color_stop s{cur, rvg_lua_to<RGBA8>(L, -1)};
 		lua_pop(L, 3);
 		return s;
 	};
