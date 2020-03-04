@@ -1,7 +1,7 @@
 #!/bin/bash
 inputs=`ls ../rvgs/*.rvg`
 outputs="../pngs-out/"
-driver='driver.png'
+driver='driver.hadryan_salles'
 program='process.lua'
 lua='luapp5.3'
 
