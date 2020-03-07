@@ -10,6 +10,7 @@ implicit tests,
 openmp parallel for,
 super sampling,
 quad-tree acceleration
+recursive subdivision parallel with omp task
 
 arguments:
 -pattern:<samples per pixel>
