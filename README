@@ -1,3 +1,5 @@
+Vector Graphics Renderer (multiple cores on CPU)
+
 linear path, 
 quadratic path, 
 rational quadratic path, 
@@ -10,6 +12,7 @@ implicit tests,
 openmp parallel for,
 super sampling,
 quad-tree acceleration
+recursive subdivision parallel with omp task
 
 arguments:
 -pattern:<samples per pixel>
