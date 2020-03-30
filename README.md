@@ -27,32 +27,29 @@ Despite the project was primarily intended to be implemented in Lua language loa
 ### Extras:
 I developed some tools to auxiliate my tests, among them:
 - Script to test all the rvgs files comparing with previous versions of the same rendered images, allowing to track any new bug introduced in opmitization stages.
-- Video-creating script to test multiple sequence of translations in some scene
+- Video-creating script to test a sequence of translations in some scene
 
 ![Alt Text](https://github.com/hadryans/CG2D-IMPA/blob/master/pngs/output.gif)
 
 ## Building
 
-I'm not guessing that anyone would be interested in build that software, but if you want, you could just mount the docker image on [https://hub.docker.com/r/diegonehab/vg](https://hub.docker.com/r/diegonehab/vg) inside my folder directory  and run
+I'm not guessing that anyone would be interested in build that software, but if you want, you could just mount the docker image on [https://hub.docker.com/r/diegonehab/vg](https://hub.docker.com/r/diegonehab/vg) inside my folder directory and run
 
 	make -f hadryan_salles_makefile
 
-Or, for an "hardcore" method, you'll need a Lua program compiled with C++ and follow the instructions inside hadryan_salles_makefile.
+Or, for a "hardcore" method, you'll need a Lua program compiled with C++ and follow the instructions inside hadryan_salles_makefile.
 
 ## Running 
-The software works with driver shared objects loaded by an Lua script. The command to render any RVG file is:
+The software works with driver shared objects invoked by a Lua script. The command to render any RVG file is:
 
 	luapp process.lua driver.hadryan_salles <file.rvg> <out.png> 
 
 With support to the following flags:
 
-	-tx : <float x-axis translation>
-	-ty : <float y-axis translation>
-	-pattern : <int samples per pixel>
-	-j : <int number of threads to be used by OpenMP>
-
-## Considerations
-The summer course experience was really amazing and the learnship was huge. I would like to thank Diego, Pedro and all the classmates.
+	-tx <float x-axis translation>
+	-ty <float y-axis translation>
+	-pattern <int (1,8,16,32 or 64) samples per pixel>
+	-j <int number of threads to be used by OpenMP>
 
 ## References
 - Shortcut Tree: Ganacim, F.; Lima, R. S.; de Figueiredo, L. H.; Nehab, D. [“Massively-parallel vector graphics”](http://www.impa.br/~diego/publications/GanEtAl14.pdf), _ACM Transactions on Graphics (Proceedings of the ACM SIGGRAPH Asia 2014)_, 36(6):229, 2014.
