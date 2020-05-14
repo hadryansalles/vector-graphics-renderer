@@ -38,6 +38,7 @@ LP_LIB_Linux=$(shell $(PKG) --libs lapack)
 #---
 # Subset of targets to build
 #---
+vg_build_png=yes
 vg_build_strokers?=no
 vg_build_cairo?=no
 vg_build_qt5?=no
@@ -232,6 +233,8 @@ rvg-driver-qt5.o: INC += $(LUA_INC) $(QT5_INC)
 rvg-driver-skia.o: INC += $(LUA_INC) $(SKIA_INC)
 rvg-driver-rg.o: INC += $(LUA_INC)
 rvg-driver-rg2.o: INC += $(LUA_INC)
+hadryan_salles.o: INC += $(LUA_INC) 
+
 
 rvg-freetype.o: INC += $(FT_INC)
 test-text.o: INC += $(FT_INC)
@@ -307,8 +310,16 @@ SO_FILTER_OBJ:= \
 	$(DRV_OBJ) \
 	$(ST_OBJ)
 
-SO_HARFBUZZ_OBJ:= rvg-lua-harfbuzz.o rvg-lua.o
+HADRYAN_OBJ:= \
+	hadryan_salles.o \
+	hadryan-bouding-box.o \
+	hadryan-path-segment.o \
+	hadryan-linear-path-segment.o \
+	hadryan-quadratic-path-segment.o \
+	hadryan-cubic-path-segment.o \
 
+SO_HARFBUZZ_OBJ:= rvg-lua-harfbuzz.o rvg-lua.o
+SO_PNG_DRV_OBJ:= $(HADRYAN_OBJ) $(DRV_OBJ)
 SO_SVG_DRV_OBJ:= rvg-driver-svg.o $(DRV_OBJ)
 SO_EPS_DRV_OBJ:= rvg-driver-eps.o $(DRV_OBJ)
 SO_NVPR_DRV_OBJ:= rvg-driver-nvpr.o $(DRV_OBJ)
@@ -344,6 +355,7 @@ T_STROKE_OBJ := test-stroke.o rvg-util.o rvg-gaussian-quadrature.o rvg-path-data
 OBJ:= \
 	$(SO_BASE64_OBJ) \
 	$(SO_UTIL_OBJ) \
+	$(SO_PNG_DRV_OBJ) \
 	$(SO_CHRONOS_OBJ) \
 	$(SO_IMAGE_OBJ) \
 	$(SO_FACADE_OBJ) \
@@ -374,6 +386,11 @@ TARGETS:= \
 ifeq ($(vg_build_nvpr),yes)
 OBJ += $(SO_NVPR_DRV_OBJ)
 TARGETS += driver/nvpr.so
+endif
+
+ifeq ($(vg_build_png),yes)
+OBJ+= $(SO_PNG_DRV_OBJ)
+TARGETS += driver/hadryan_salles.so
 endif
 
 ifeq ($(vg_build_cairo),yes)
@@ -559,6 +576,10 @@ driver/distroke.so: $(SO_DISTROKE_DRV_OBJ)
 	mkdir -p driver
 	$(CXX) $(SOLDFLAGS) -o $@ $^ $(PNG_LIB) $(B64_LIB) $(OMP_LIB) $(LP_LIB)
 
+driver/hadryan_salles.so: $(SO_PNG_DRV_OBJ)
+	mkdir -p driver
+	$(CXX) $(SOLDFLAGS) -o $@ $^ $(PNG_LIB) $(B64_LIB) $(LP_LIB) $(OMP_LIB)
+
 driver/svg.so: $(SO_SVG_DRV_OBJ)
 	mkdir -p driver
 	$(CXX) $(SOLDFLAGS) -o $@ $^ $(PNG_LIB) $(B64_LIB) $(LP_LIB)
@@ -629,6 +650,19 @@ config:
 	@echo LP_INC: $(LP_INC)
 
 DIST_CPP_SRC := \
+	hadryan_salles.cpp \
+	hadryan_salles.h \
+	hadryan-bouding-box.cpp \
+	hadryan-bouding-box.h \
+	hadryan-input-path-not-interger.h \
+	hadryan-linear-path-segment.cpp \
+	hadryan-linear-path-segment.h \
+	hadryan-path-segment.cpp \
+	hadryan-path-segment.h \
+	hadryan-quadratic-path-segment.cpp \
+	hadryan-quadratic-path-segment.h \
+	hadryan-cubic-path-segment.cpp \
+	hadryan-cubic-path-segment.h \
 	rvg-adjacent-range.h \
 	rvg-align.h \
 	rvg-arc-length.h \
@@ -701,6 +735,7 @@ DIST_CPP_SRC := \
 	rvg-indent.h \
 	rvg-inplace-polynomial.h \
 	rvg-input-path-f-close-contours.h \
+	rvg-input-path-f-downgrade-degenerate.h \
 	rvg-input-path-f-downgrade-degenerates.h \
 	rvg-input-path-f-find-cubic-parameters.h \
 	rvg-input-path-f-find-monotonic-parameters.h \

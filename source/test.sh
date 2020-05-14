@@ -7,7 +7,6 @@ lua='luapp5.3'
 
 [ ! -d $outputs ] && mkdir $outputs
 rm $outputs*
-START=$(date +%s.%N)
 for input in $inputs
 do
     filename=$(basename -- "$input")
@@ -16,6 +15,3 @@ do
     output=$outputs$filename".png" 
     $lua $program $driver $input $output $@
 done
-END=$(date +%s.%N)
-DIFF=$(echo "$END - $START" | bc)
-echo "TOTAL TIME: $DIFF"
