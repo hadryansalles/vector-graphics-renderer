@@ -50,8 +50,8 @@ const accelerated accelerate(const scene &c, const window &w,
     for(auto &obj : acc.objects) {
         node_object node_obj(obj);
         // insert in a node if collides with cell
-        if(first_leave->intersect(obj->m_bbox)){
-            for(auto &seg : obj->m_path) {
+        if(first_leave->intersect(obj->get_bbox())){
+            for(auto &seg : obj->get_path()) {
                 bool hit_br_tr = hit_v_bound(xr, yb, yt, seg);
                 bool hit_bl_br = hit_h_bound(yb, xl, xr, seg);
                 bool hit_bl_tl = hit_v_bound(xl, yb, yt, seg);
@@ -81,7 +81,7 @@ const accelerated accelerate(const scene &c, const window &w,
     if(first_leave != acc.root) {
         delete first_leave;
     }
-    return acc;
+    return std::move(acc);
 }
 
 inline RGBA8 sample_cell(const leave_node* nod, const double &x, const double &y) {

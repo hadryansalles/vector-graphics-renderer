@@ -9,7 +9,7 @@ node_object::node_object(const scene_object* ptr)
 }
 
 bool node_object::hit(const double x, const double y) const {
-    bool in_path = m_ptr->m_bbox.hit_inside(x, y);
+    bool in_path = m_ptr->get_bbox().hit_inside(x, y);
     if(in_path) { 
         int sum = m_w_increment;
         for(auto &seg : m_segments){

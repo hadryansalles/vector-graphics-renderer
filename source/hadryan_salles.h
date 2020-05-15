@@ -113,6 +113,7 @@ private:
     inline void do_end_fade(uint16_t depth, unorm8 opacity){(void) depth;(void) opacity;};
     inline void do_begin_blur(uint16_t depth, float radius){(void) depth;(void) radius;};
     inline void do_end_blur(uint16_t depth, float radius){(void) depth;(void) radius;};
+    
 public:
     inline accelerated_builder(accelerated &acc_in, 
         const std::vector<std::string> &args, const xform &screen_xf);

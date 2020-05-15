@@ -2,6 +2,7 @@
 #define HADRYAN_SCENE_OBJECT_H
 
 #include <vector>
+#include <memory>
 
 #include "rvg-paint.h"
 
@@ -16,17 +17,22 @@ namespace hadryan {
 class scene_object {
 private:
     e_winding_rule m_wrule;
-    color_solver* color;
-public:
+    std::unique_ptr<color_solver> m_color;
     std::vector<path_segment*> m_path;
     bouding_box m_bbox;
+
+    scene_object(const scene_object &rhs) = delete;
+    scene_object& operator=(const scene_object &rhs) = delete;
+public:
+
 public:
     scene_object(std::vector<path_segment*> &path, const e_winding_rule &wrule, const paint &paint_in);
-    scene_object(const scene_object &rhs) = delete;
     ~scene_object();
-    scene_object& operator=(const scene_object &rhs) = delete;
     RGBA8 get_color(const double x, const double y) const;
     bool satisfy_wrule(int winding) const;
+
+    const auto& get_path() const {return m_path;}
+    const bouding_box& get_bbox() const {return m_bbox;}
 };
 
 inline bool scene_object::satisfy_wrule(int winding) const {
@@ -40,7 +46,7 @@ inline bool scene_object::satisfy_wrule(int winding) const {
 }
 
 inline RGBA8 scene_object::get_color(const double x, const double y) const {
-    return color->solve(x, y);
+    return m_color->solve(x, y);
 }
 
 } // hadryan

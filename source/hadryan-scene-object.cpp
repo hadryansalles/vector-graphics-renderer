@@ -23,18 +23,18 @@ scene_object::scene_object(std::vector<path_segment*> &path, const e_winding_rul
     }
     m_bbox = bouding_box(bb0, bb1);
     if(paint_in.is_solid_color()) {
-        color = new color_solver(paint_in);
+        m_color = std::make_unique<color_solver>(paint_in);
     } else if(paint_in.is_linear_gradient()) {
-        color = new linear_gradient_solver(paint_in);
+        m_color = std::make_unique<linear_gradient_solver>(paint_in);
     } else if(paint_in.is_radial_gradient()) {
-        color = new radial_gradient_solver(paint_in);
+        m_color = std::make_unique<radial_gradient_solver>(paint_in);
     } else if(paint_in.is_texture()) { 
-        color = new texture_solver(paint_in);
+        m_color = std::make_unique<texture_solver>(paint_in);
     } else {
         RGBA8 s_transparent(0, 0, 0, 0);
         unorm8 s_opacity(0);
         paint s_paint(s_transparent, s_opacity);
-        color = new color_solver(s_paint);
+        m_color = std::make_unique<color_solver>(s_paint);
     }
 }
 
@@ -43,7 +43,6 @@ scene_object::~scene_object() {
         delete seg;
         seg = NULL;
     }
-    delete color;
     m_path.clear();
 }
 
