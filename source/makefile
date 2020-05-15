@@ -317,6 +317,16 @@ HADRYAN_OBJ:= \
 	hadryan-linear-path-segment.o \
 	hadryan-quadratic-path-segment.o \
 	hadryan-cubic-path-segment.o \
+	hadryan-color-solver.o \
+	hadryan-color-gradient-solver.o \
+	hadryan-linear-gradient-solver.o \
+	hadryan-radial-gradient-solver.o \
+	hadryan-texture-color-solver.o \
+	hadryan-scene-object.o \
+	hadryan-node-object.o \
+	hadryan-tree-node.o \
+	hadryan-intern-node.o \
+	hadryan-leave-node.o \
 
 SO_HARFBUZZ_OBJ:= rvg-lua-harfbuzz.o rvg-lua.o
 SO_PNG_DRV_OBJ:= $(HADRYAN_OBJ) $(DRV_OBJ)
@@ -663,6 +673,28 @@ DIST_CPP_SRC := \
 	hadryan-quadratic-path-segment.h \
 	hadryan-cubic-path-segment.cpp \
 	hadryan-cubic-path-segment.h \
+	hadryan-color-solver.cpp \
+	hadryan-color-solver.h \
+	hadryan-color-gradient-solver.cpp \
+	hadryan-color-gradient-solver.h \
+	hadryan-color-gradient-solver.cpp \
+	hadryan-linear-gradient-solver.cpp \
+	hadryan-linear-gradient-solver.h \
+	hadryan-radial-gradient-solver.cpp \
+	hadryan-radial-gradient-solver.h \
+	hadryan-texture-color-solver.cpp \
+	hadryan-texture-color-solver.h \
+	hadryan-quad-tree-auxiliar.h \
+	hadryan-scene-object.cpp \
+	hadryan-scene-object.h \
+	hadryan-node-object.cpp \
+	hadryan-node-object.h \
+	hadryan-tree-node.cpp \
+	hadryan-tree-node.h \
+	hadryan-intern-node.cpp \
+	hadryan-intern-node.h \
+	hadryan-leave-node.cpp \
+	hadryan-leave-node.h \
 	rvg-adjacent-range.h \
 	rvg-align.h \
 	rvg-arc-length.h \

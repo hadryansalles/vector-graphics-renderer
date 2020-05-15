@@ -10,6 +10,13 @@ using namespace rvg;
 namespace hadryan {
 
 class cubic : public path_segment {
+public:
+    cubic(const R2 &p0, const R2 &p1, const R2 &p2, const R2 &p3);
+    int triangle_hits(double x, double y) const;
+    bool hit_me(double x, double y) const;
+    bool implicit_hit(double x, double y) const;
+
+private:
     double A;
     double B;
     double C;
@@ -21,11 +28,6 @@ class cubic : public path_segment {
     double I;
     double m_der;
     std::vector<linear> m_tri; 
-public:
-    cubic(const R2 &p0, const R2 &p1, const R2 &p2, const R2 &p3);
-    int triangle_hits(double x, double y) const;
-    bool hit_me(double x, double y) const;
-    bool implicit_hit(double x, double y) const;
 };
 
 inline bool cubic::hit_me(double x, double y) const {
