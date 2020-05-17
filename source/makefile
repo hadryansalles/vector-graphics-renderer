@@ -233,7 +233,8 @@ rvg-driver-qt5.o: INC += $(LUA_INC) $(QT5_INC)
 rvg-driver-skia.o: INC += $(LUA_INC) $(SKIA_INC)
 rvg-driver-rg.o: INC += $(LUA_INC)
 rvg-driver-rg2.o: INC += $(LUA_INC)
-hadryan_salles.o: INC += $(LUA_INC) 
+
+hadryan-driver-png.o: INC += $(LUA_INC) 
 
 
 rvg-freetype.o: INC += $(FT_INC)
@@ -311,7 +312,7 @@ SO_FILTER_OBJ:= \
 	$(ST_OBJ)
 
 HADRYAN_OBJ:= \
-	hadryan_salles.o \
+	hadryan-driver-png.o \
 	hadryan-bouding-box.o \
 	hadryan-path-segment.o \
 	hadryan-linear-path-segment.o \
@@ -327,6 +328,9 @@ HADRYAN_OBJ:= \
 	hadryan-tree-node.o \
 	hadryan-intern-node.o \
 	hadryan-leave-node.o \
+	hadryan-monotonic-path-builder.o \
+	hadryan-accelerated.o \
+	hadryan-accelerated-builder.o 
 
 SO_HARFBUZZ_OBJ:= rvg-lua-harfbuzz.o rvg-lua.o
 SO_PNG_DRV_OBJ:= $(HADRYAN_OBJ) $(DRV_OBJ)
@@ -660,8 +664,8 @@ config:
 	@echo LP_INC: $(LP_INC)
 
 DIST_CPP_SRC := \
-	hadryan_salles.cpp \
-	hadryan_salles.h \
+	hadryan-driver-png.cpp \
+	hadryan-driver-png.h \
 	hadryan-bouding-box.cpp \
 	hadryan-bouding-box.h \
 	hadryan-input-path-not-interger.h \
@@ -695,6 +699,12 @@ DIST_CPP_SRC := \
 	hadryan-intern-node.h \
 	hadryan-leave-node.cpp \
 	hadryan-leave-node.h \
+	hadryan-monotonic-path-builder.cpp \
+	hadryan-monotonic-path-builder.h \
+	hadryan-accelerated.cpp \
+	hadryan-accelerated.h \
+	hadryan-accelerated-bulder.cpp \
+	hadryan-accelerated-bulder.h \
 	rvg-adjacent-range.h \
 	rvg-align.h \
 	rvg-arc-length.h \
