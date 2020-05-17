@@ -1,6 +1,6 @@
 # 2D Computer Graphics
 This application was the final project of 2DCG summer course at IMPA 2020, it implements a Vector Graphics renderer with some features for purely educational purposes. 
-All the source files starting with "rvg-" were provided by professor Diego Nehab and my work is completely inside "hadryan_salles.h/cpp", so I'm not the author of any other file.
+All the source files starting with "rvg-" were provided by professor Diego Nehab and my work is completely inside hadryan namespace, so I'm not the author of any other file.
 
 ## Vector Graphics Renderer
 
