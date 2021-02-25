@@ -1,12 +1,12 @@
 # 2D Computer Graphics
-This application was the final project of 2DCG summer course at IMPA 2020, it implements a Vector Graphics renderer with some features for purely educational purposes. 
-All the source files starting with "rvg-" were provided by professor Diego Nehab and my work is completely inside hadryan namespace, so I'm not the author of any other file.
+This software was the final project of 2DCG summer course at IMPA 2020, it's a Vector Graphics renderer with some features. 
+All the source files starting with "rvg-" were provided by professor Diego Nehab and my work is completely inside "hadryan" namespace, so I'm not the author of any other file.
 
 ## Vector Graphics Renderer
 
 ![alt text](https://github.com/hadryans/CG2D-IMPA/blob/master/pngs/paris.png)
 
-This software is able to render vector graphics scenes described by the custom extension "rvg", with support to the following features:
+This software is able to render vector graphics scenes described by the custom extension "rvg", supporting the following elements:
 
 - Primitive shapes (lines, triangles, polygons and ellipses)
 - Bezier paths (quadratic, cubic and rational quadratic)
@@ -15,32 +15,32 @@ This software is able to render vector graphics scenes described by the custom e
 - Color transparency
 - Color gradients (linear and radial)
 
-The implementation of the project had some goals:
+The implementation of the project also had some optimization goals:
 
 - Implicit tests for Bezier paths
 - Acceleration structure
 
-We studied two acceleration structures, the Regular Grid and the Shortcut Tree and any of these could been chosen to the final assignment. I did the Shortcut Tree, mainly because the desire to learn an adaptative aproach.
+We studied two acceleration structures, the Regular Grid and the Shortcut Tree. Any of these could been chosen to the final assignment. I did the Shortcut Tree, because I was interested in implementing an adaptative method.
 
-Despite the project was primarily intended to be implemented in Lua language loaded by C++ framework, Diego also give the tools to work with C++ (e.g. makefile).  Develop that project in C++ gave me the opportunity to (besides rendering much faster :P) include support to OpenMP.
+Despite the project was primarily intended to be implemented in Lua language loaded by C++ framework, Diego also gave the tools to work with C++ (e.g. makefile). Develop this project in C++ gave me the opportunity to (besides rendering much faster) include support to use parallel computing via OpenMP.
 
 ### Extras:
-I developed some tools to auxiliate my tests, among them:
-- Script to test all the rvgs files comparing with previous versions of the same rendered images, allowing to track any new bug introduced in opmitization stages.
+I also developed some tools to auxiliate my tests:
+- Script to render all the rvgs files and comparing them to previous versions of the same rendered images, allowing to track any new bug introduced in opmitization stages.
 - Video-creating script to test a sequence of translations in some scene
 
 ![Alt Text](https://github.com/hadryans/CG2D-IMPA/blob/master/pngs/output.gif)
 
 ## Building
 
-I'm not guessing that anyone would be interested in build that software, but if you want, you could just mount the docker image on [https://hub.docker.com/r/diegonehab/vg](https://hub.docker.com/r/diegonehab/vg) inside my folder directory and run
+Mount the docker image of [https://hub.docker.com/r/diegonehab/vg](https://hub.docker.com/r/diegonehab/vg) inside my folder directory and run
 
 	make -f hadryan_salles_makefile
 
-Or, for a "hardcore" method, you'll need a Lua program compiled with C++ and follow the instructions inside hadryan_salles_makefile.
+Or for a "hardcore" method, you'll need to have Lua compiled with C++, then follow the instructions inside hadryan_salles_makefile.
 
 ## Running 
-The software works with driver shared objects invoked by a Lua script. The command to render any RVG file is:
+The software works with shared libraries invoked by a Lua script. The command to render any RVG file is:
 
 	luapp process.lua driver.hadryan_salles <file.rvg> <out.png> 
 
